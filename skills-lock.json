@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "laravel-livewire": {
+      "source": "1naichii/ai-code-tools",
+      "sourceType": "github",
+      "skillPath": "skills/laravel-livewire/SKILL.md",
+      "computedHash": "19e7333fe3fcda8bfa2492460dba6456a0aa81fe113b79a3c65f3bd1456f5faf"
+    }
+  }
+}
