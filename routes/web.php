@@ -6,6 +6,11 @@ Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
+
+    Route::view('vehiculos/colores', 'pages.vehicles.colors')->name('vehicles.colors');
+    Route::livewire('vehiculos/marcas', 'vehicles.brands.index')->name('vehicles.brands.index');
+    Route::view('vehiculos/modelos', 'pages.vehicles.models')->name('vehicles.models');
+    Route::view('vehiculos/tipos', 'pages.vehicles.types')->name('vehicles.types');
 });
 
 require __DIR__.'/settings.php';

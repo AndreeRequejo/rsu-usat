@@ -18,6 +18,43 @@
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
+            <flux:sidebar.nav>
+                <flux:sidebar.group :heading="__('Gestion de vehiculos')" class="grid">
+                    <flux:sidebar.item
+                        icon="layout-grid"
+                        :href="route('vehicles.colors')"
+                        :current="request()->routeIs('vehicles.colors')"
+                        wire:navigate
+                    >
+                        {{ __('Colores') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item
+                        icon="layout-grid"
+                        :href="route('vehicles.brands.index')"
+                        :current="request()->routeIs('vehicles.brands.*')"
+                        wire:navigate
+                    >
+                        {{ __('Marcas') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item
+                        icon="layout-grid"
+                        :href="route('vehicles.models')"
+                        :current="request()->routeIs('vehicles.models')"
+                        wire:navigate
+                    >
+                        {{ __('Modelos') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item
+                        icon="layout-grid"
+                        :href="route('vehicles.types')"
+                        :current="request()->routeIs('vehicles.types')"
+                        wire:navigate
+                    >
+                        {{ __('Tipo de vehiculos') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            </flux:sidebar.nav>
+
             <flux:spacer />
 
             <flux:sidebar.nav>
