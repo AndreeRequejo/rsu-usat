@@ -5,6 +5,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Flux\Flux;
+use Illuminate\Validation\Rule;
 
 new class extends Component {
     use WithPagination;
@@ -19,11 +20,21 @@ new class extends Component {
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:100'],
+            'name' => ['required', 'string', 'max:100', Rule::unique('vehicletypes', 'name')
+                ->ignore($this->editingId),],
             'description' => ['nullable', 'string'],
+            
         ];
     }
-
+    protected function messages(): array
+    {
+        return [
+            'name.required' => __('El nombre es obligatorio.'),
+            'name.string' => __('El nombre debe ser un texto.'),
+            'name.max' => __('El nombre no puede tener más de 100 caracteres.'),
+            'name.unique' => __('Ya existe un tipo de vehículo con ese nombre.'), 
+        ];
+    }
     public function save(): void
     {
         $validated = $this->validate();
