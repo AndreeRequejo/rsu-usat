@@ -21,7 +21,6 @@
             <flux:sidebar.nav>
                 <div x-data="{ open: true }" class="w-full">
 
-                    <!-- Header desplegable -->
                     <button
                         @click="open = !open"
                         class="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold"
@@ -40,7 +39,6 @@
                         </svg>
                     </button>
 
-                    <!-- Items colapsables -->
                     <div x-show="open" x-collapse class="grid pl-2">
 
                         <flux:sidebar.item
