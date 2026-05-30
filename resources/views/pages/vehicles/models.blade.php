@@ -15,7 +15,6 @@ new class extends Component {
     public ?int $editingId = null;
 
     public string $name = '';
-    public string $code = '';
     public string $description = '';
     public ?int $brand_id = null;
 
@@ -23,7 +22,6 @@ new class extends Component {
     {
         return [
             'name' => ['required', 'string', 'max:150'],
-            'code' => ['required', 'string', 'max:50'],
             'description' => ['nullable', 'string'],
             'brand_id' => ['required', 'exists:brands,id'],
         ];
@@ -38,6 +36,10 @@ new class extends Component {
             $model->update($validated);
             Flux::toast(variant: 'success', text: __('Modelo actualizado.'));
         } else {
+            // Auto-generación del código
+            $brand = Brand::find($this->brand_id);
+            $validated['code'] = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $this->name), 0, 3) . '-' . substr(preg_replace('/[^A-Za-z0-9]/', '', $brand->name), 0, 3) . '-' . date('y'));
+
             BrandModel::create($validated);
             Flux::toast(variant: 'success', text: __('Modelo creado.'));
         }
@@ -59,7 +61,6 @@ new class extends Component {
         $model = BrandModel::findOrFail($id);
         $this->editingId = $model->id;
         $this->name = $model->name;
-        $this->code = $model->code ?? '';
         $this->description = $model->description ?? '';
         $this->brand_id = $model->brand_id;
         $this->showModal = true;
@@ -113,7 +114,7 @@ new class extends Component {
 
     private function resetForm(): void
     {
-        $this->reset(['name', 'code', 'description', 'brand_id', 'editingId']);
+        $this->reset(['name', 'description', 'brand_id', 'editingId']);
         $this->resetErrorBag();
         $this->resetValidation();
     }
@@ -242,7 +243,7 @@ new class extends Component {
                     {{ $editingId ? __('Editar modelo') : __('Nuevo modelo') }}
                 </flux:heading>
                 <flux:text class="mt-2">
-                    {{ __('Ingresa el nombre, código, marca y descripción opcional.') }}
+                    {{ __('Ingresa el nombre, marca y descripción opcional.') }}
                 </flux:text>
             </div>
 
@@ -250,22 +251,16 @@ new class extends Component {
                 wire:model="name"
                 :label="__('Nombre del Modelo')"
                 placeholder="{{ __('Ej. Corolla, F-150') }}"
-                required
-            />
-
-            <flux:input
-                wire:model="code"
-                :label="__('Código del Modelo')"
-                placeholder="{{ __('Ej. COR-2023, F15-2024') }}"
-                required
             />
 
             <flux:select
                 wire:model="brand_id"
                 :label="__('Marca')"
-                placeholder="{{ __('Seleccione una marca') }}"
-                required
             >
+                <x-slot:label>
+                    {{ __('Marca') }}
+                </x-slot:label>
+                <option value="" disabled>{{ __('Seleccione una marca') }}</option>
                 @foreach ($this->brands as $brand)
                     <option value="{{ $brand->id }}">{{ $brand->name }}</option>
                 @endforeach
