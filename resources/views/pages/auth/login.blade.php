@@ -89,7 +89,7 @@
                     name="remember"
                     type="checkbox"
                     {{ old('remember') ? 'checked' : '' }}
-                    class="h-4 w-4 rounded border-neutral-300 text-green-600 focus:ring-green-500"
+                    class="h-4 w-4 rounded border-neutral-300 accent-green-900 hover:accent-green-600"
                 >
                 <label for="remember" class="text-sm text-neutral-600">Mantener sesión iniciada</label>
             </div>
