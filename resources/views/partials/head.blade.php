@@ -6,10 +6,15 @@
 </title>
 
 <link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="logo" href="/logo.png">
 
 @fonts
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+<script>
+    if (!window.localStorage.getItem('flux.appearance')) {
+        window.localStorage.setItem('flux.appearance', 'light');
+    }
+</script>
 @fluxAppearance
