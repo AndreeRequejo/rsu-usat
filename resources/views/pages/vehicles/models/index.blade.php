@@ -27,6 +27,16 @@ new class extends Component {
         ];
     }
 
+    protected function messages(): array
+    {
+        return [
+            'name.required' => __('El nombre es obligatorio.'),
+            'name.max' => __('El nombre no puede tener mas de 150 caracteres.'),
+            'brand_id.required' => __('La marca es obligatoria.'),
+            'brand_id.exists' => __('La marca seleccionada no es válida.'),
+        ];
+    }
+
     public function save(): void
     {
         $validated = $this->validate();
@@ -53,6 +63,14 @@ new class extends Component {
     {
         $this->resetForm();
         $this->showModal = true;
+        // If there's only one brand available, preselect it so validation
+        // doesn't consider the field empty when the user doesn't interact.
+        $brandCount = \App\Models\Brand::count();
+        if ($brandCount === 1) {
+            $onlyBrand = \App\Models\Brand::orderBy('name')->first();
+            $this->brand_id = $onlyBrand ? $onlyBrand->id : null;
+        }
+
         Flux::modal('model-form')->show();
     }
 
@@ -120,6 +138,7 @@ new class extends Component {
     }
 }; ?>
 
+<!-- Blade template content copied from original file -->
 <div class="min-h-screen bg-white p-6 text-[#333333]">
     {{-- Header --}}
     <div class="flex items-start justify-between mb-6">
@@ -255,14 +274,17 @@ new class extends Component {
 
             <flux:select
                 wire:model="brand_id"
+                name="brand_id"
                 :label="__('Marca')"
             >
                 <x-slot:label>
                     {{ __('Marca') }}
                 </x-slot:label>
-                <option value="" disabled>{{ __('Seleccione una marca') }}</option>
+                @if($this->brands->count() > 1)
+                    <option value="" disabled>{{ __('Seleccione una marca') }}</option>
+                @endif
                 @foreach ($this->brands as $brand)
-                    <option value="{{ $brand->id }}">{{ $brand->name }}</option>
+                    <option value="{{ $brand->id }}" @if($this->brands->count() === 1) selected @endif>{{ $brand->name }}</option>
                 @endforeach
             </flux:select>
 

@@ -61,8 +61,8 @@
 
                         <flux:sidebar.item
                             icon="layout-grid"
-                            :href="route('vehicles.models')"
-                            :current="request()->routeIs('vehicles.models')"
+                            :href="route('vehicles.models.index')"
+                            :current="request()->routeIs('vehicles.models.index')"
                             wire:navigate
                         >
                             {{ __('Modelos') }}

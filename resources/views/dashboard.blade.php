@@ -41,7 +41,7 @@
                     <span>Marcas</span>
                 </a>
 
-                <a href="{{ route('vehicles.models') }}"
+                <a href="{{ route('vehicles.models.index') }}"
                    class="bg-gray-100 rounded-xl shadow p-5 hover:bg-green-50 transition flex flex-col items-center justify-center gap-2">
                     <i class="fas fa-car-side fa-2x text-green-500"></i>
                     <span>Modelos</span>

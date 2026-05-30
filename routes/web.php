@@ -9,7 +9,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::view('vehiculos/colores', 'pages.vehicles.colors')->name('vehicles.colors');
     Route::livewire('vehiculos/marcas', 'vehicles.brands.index')->name('vehicles.brands.index');
-    Route::livewire('vehiculos/modelos', 'vehicles.models')->name('vehicles.models');
+    Route::livewire('vehiculos/modelos', 'vehicles.models.index')->name('vehicles.models.index');
     Route::livewire('vehiculos/tipos', 'vehicles.types.index')->name('vehicles.types.index');
 });
 
