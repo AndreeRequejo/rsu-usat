@@ -8,7 +8,7 @@
             </h1>
 
             <p class="mt-2 text-green-100">
-                Gestión de Residuos Sólidos Universitarios y administración de vehículos de recolección.
+                Gestión de Residuos Sólidos Urbanos - Municipalidad de José Leonardo Ortiz
             </p>
         </div>
 
@@ -20,7 +20,7 @@
             </h2>
 
             <p class="text-gray-600 mt-2">
-                Desde este panel podrá administrar la información relacionada con los vehículos utilizados en la recolección y gestión de residuos sólidos de la Universidad Católica Santo Toribio de Mogrovejo.
+                Desde este panel podrá administrar la información relacionada con los vehículos utilizados en la recolección y gestión de residuos sólidos de la Municipalidad de José Leonardo Ortiz.
             </p>
         </div>
         <div class="bg-white rounded-xl shadow p-6">
