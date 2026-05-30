@@ -24,7 +24,7 @@
         <header class="border-b border-neutral-200 bg-white">
             <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
                 <a href="{{ route('home') }}" class="flex items-center gap-3" wire:navigate>
-                    <img src="/logo-municipalidad.png" alt="Municipalidad" class="h-12 w-auto">
+                    <img src="/logo-municipalidad.png" alt="Municipalidad" class="h-12 w-auto brightness-0">
                     <div class="hidden sm:block leading-tight">
                         <p class="text-[11px] font-semibold tracking-wide uppercase text-neutral-500">Municipalidad Distrital</p>
                         <p class="text-sm font-bold text-neutral-900">José Leonardo Ortiz</p>
@@ -36,7 +36,7 @@
                         @auth
                             <a
                                 href="{{ route('dashboard') }}"
-                                class="inline-flex items-center gap-2 rounded-full bg-[#012A59] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#012A59]/80"
+                                class="inline-flex items-center gap-2 rounded-full bg-green-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-800"
                                 wire:navigate
                             >
                                 <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -50,7 +50,7 @@
                         @else
                             <a
                                 href="{{ route('register') }}"
-                                class="inline-flex items-center gap-2 rounded-full bg-[#012A59] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#012A59]/80"
+                                class="inline-flex items-center gap-2 rounded-full bg-green-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-800"
                                 wire:navigate
                             >
                                 Registrarse
