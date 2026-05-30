@@ -18,6 +18,8 @@ new class extends Component {
     public string $code = '#104CAD';
     public string $description = '';
 
+    public ?int $deletingId = null;
+
     protected function rules(): array
     {
         return [
@@ -98,15 +100,25 @@ new class extends Component {
         Flux::modal('vehicle-color-form')->close();
     }
 
-    public function delete(int $id): void
+    public function confirmDelete(int $id): void
     {
-        $vehicleColor = VehicleColor::findOrFail($id);
+        $this->deletingId = $id;
+        Flux::modal('confirm-delete')->show();
+    }
+
+    public function delete(): void
+    {
+        if (!$this->deletingId) return;
+
+        $vehicleColor = VehicleColor::findOrFail($this->deletingId);
         $vehicleColor->delete();
         Flux::toast(variant: 'success', text: __('Color eliminado.'));
 
-        if ($this->editingId === $id) {
+        if ($this->editingId === $this->deletingId) {
             $this->resetForm();
         }
+        $this->deletingId = null;
+        Flux::modal('confirm-delete')->close();
     }
 
     #[Computed]
@@ -218,8 +230,7 @@ new class extends Component {
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 7.5L16.5 4.5" />
                                         </svg>
                                     </button>
-                                    <button wire:click="delete({{ $color->id }})"
-                                            wire:confirm="{{ __('¿Eliminar este color?') }}"
+                                    <button wire:click="confirmDelete({{ $color->id }})"
                                             class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
                                             title="{{ __('Eliminar') }}"
                                             aria-label="{{ __('Eliminar') }}">
@@ -305,5 +316,28 @@ new class extends Component {
                 </flux:button>
             </div>
         </form>
+    </flux:modal>
+
+    {{-- Modal confirmar eliminación --}}
+    <flux:modal name="confirm-delete" class="md:w-[400px]">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg" class="text-red-500">
+                    {{ __('Confirmar eliminación') }}
+                </flux:heading>
+                <flux:text class="mt-2 text-sm text-[#333333]">
+                    {{ __('¿Estás seguro de que deseas eliminar este color? Esta acción no se puede deshacer.') }}
+                </flux:text>
+            </div>
+
+            <div class="flex gap-3 justify-end pt-4 border-t border-[#E0E0E0]">
+                <flux:button x-on:click="Flux.modal('confirm-delete').close()" type="button">
+                    {{ __('Cancelar') }}
+                </flux:button>
+                <flux:button wire:click="delete" variant="danger" class="bg-[#E53935] text-white">
+                    {{ __('Eliminar') }}
+                </flux:button>
+            </div>
+        </div>
     </flux:modal>
 </div>
