@@ -1,11 +1,12 @@
 <?php
 
 use App\Models\VehicleType;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Flux\Flux;
-use Illuminate\Validation\Rule;
+
 
 new class extends Component {
     use WithPagination;
@@ -20,7 +21,11 @@ new class extends Component {
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:100', Rule::unique('vehicletypes', 'name')
+            'name' => [
+                'required', 
+                'string', 
+                'max:100', 
+                Rule::unique('vehicletypes', 'name')
                 ->ignore($this->editingId),],
             'description' => ['nullable', 'string'],
             
@@ -216,7 +221,7 @@ new class extends Component {
     </div>
 
     <flux:modal name="vehicle-type-form" wire:close="closeModal" class="md:w-[520px]">
-        <form wire:submit="save" class="space-y-6">
+        <form wire:submit="save" class="space-y-6" novalidate>
             <div>
                 <flux:heading size="lg">
                     {{ $editingId ? __('Editar tipo de vehiculo') : __('Nuevo tipo de vehiculo') }}
