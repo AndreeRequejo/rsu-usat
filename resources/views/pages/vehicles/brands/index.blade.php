@@ -2,6 +2,7 @@
 
 use App\Models\Brand;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -23,9 +24,23 @@ new class extends Component {
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:150'],
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('brands', 'name')->ignore($this->editingId),
+            ],
             'description' => ['nullable', 'string'],
             'logo' => ['nullable', 'image', 'max:2048'],
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'name.required' => __('El nombre es obligatorio.'),
+            'name.max' => __('El nombre no puede tener mas de 100 caracteres.'),
+            'name.unique' => __('Ya existe una marca con ese nombre.'),
         ];
     }
 
@@ -252,7 +267,7 @@ new class extends Component {
 
     {{-- Modal crear/editar --}}
     <flux:modal name="brand-form" wire:close="closeModal" class="md:w-[520px]">
-        <form wire:submit="save" class="space-y-6">
+        <form wire:submit="save" class="space-y-6" novalidate>
             <div>
                 <flux:heading size="lg">
                     {{ $editingId ? __('Editar marca') : __('Nueva marca') }}
