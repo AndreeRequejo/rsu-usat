@@ -332,7 +332,7 @@ new class extends Component {
         <div class="px-4 py-3 border-t border-[#A5D6A7]">{{ $this->employees->links() }}</div>
     </div>
 
-    <flux:modal name="employee-form" class="md:w-[600px] max-h-[90vh] overflow-y-auto">
+    <flux:modal name="employee-form" class="md:w-150 max-h-[90vh] overflow-y-auto">
         <form wire:submit="save" class="space-y-5" novalidate>
             <div class="flex items-center justify-between px-6 pt-4 pb-2">
                 <div>
@@ -396,7 +396,7 @@ new class extends Component {
                 <div class="flex items-center gap-3">
                     <label class="flex items-center cursor-pointer">
                         <input type="checkbox" wire:model="active" class="sr-only peer">
-                        <div class="relative w-11 h-6 bg-[#CCCCCC] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#2E8B57] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2E8B57]"></div>
+                        <div class="relative w-11 h-6 bg-[#CCCCCC] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#2E8B57] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:inset-s-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2E8B57]"></div>
                         <span class="ms-3 text-sm font-medium text-[#333333]">Activo</span>
                     </label>
                 </div>
@@ -453,10 +453,10 @@ new class extends Component {
         </form>
     </flux:modal>
 
-    <flux:modal name="confirm-delete" class="md:w-[400px]">
+    <flux:modal name="confirm-delete" class="md:w-100">
         <div class="space-y-5">
             <div class="flex items-start gap-4 px-6 pt-4">
-                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                     <svg class="h-5 w-5 text-[#E53935]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
