@@ -20,6 +20,8 @@ new class extends Component {
 
     public ?int $deletingId = null;
 
+    private const PROTECTED_NAMES = ['Conductor', 'Ayudante'];
+
     protected function rules(): array
     {
         return [
@@ -86,6 +88,11 @@ new class extends Component {
 
     public function confirmDelete(int $id): void
     {
+        $personalType = PersonalType::findOrFail($id);
+        if ($this->isProtected($personalType)) {
+            Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
+            return;
+        }
         $this->deletingId = $id;
         Flux::modal('confirm-delete')->show();
     }
@@ -95,6 +102,12 @@ new class extends Component {
         if (!$this->deletingId) return;
 
         $personalType = PersonalType::findOrFail($this->deletingId);
+        if ($this->isProtected($personalType)) {
+            Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
         $personalType->delete();
         Flux::toast(variant: 'success', text: __('Tipo de personal eliminado.'));
 
@@ -120,6 +133,11 @@ new class extends Component {
     public function updatedSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function isProtected(PersonalType $personalType): bool
+    {
+        return in_array($personalType->name, self::PROTECTED_NAMES, true);
     }
 
     private function resetForm(): void
@@ -204,14 +222,16 @@ new class extends Component {
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 7.5L16.5 4.5" />
                                         </svg>
                                     </button>
-                                    <button wire:click="confirmDelete({{ $personalType->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
-                                            title="{{ __('Eliminar') }}"
-                                            aria-label="{{ __('Eliminar') }}">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
-                                        </svg>
-                                    </button>
+                                    @if (!$this->isProtected($personalType))
+                                        <button wire:click="confirmDelete({{ $personalType->id }})"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
+                                                title="{{ __('Eliminar') }}"
+                                                aria-label="{{ __('Eliminar') }}">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
+                                            </svg>
+                                        </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
