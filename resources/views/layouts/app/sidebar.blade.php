@@ -62,8 +62,8 @@
                 <flux:sidebar.group expandable :heading="__('Gestión de Personal')" icon="truck" class="grid">
                     <flux:sidebar.item
                         icon="swatch"
-                        :href="route('personal.types.index')"
-                        :current="request()->routeIs('personal.types.*')"
+                        :href="route('personnel.types.index')"
+                        :current="request()->routeIs('personnel.types.*')"
                         wire:navigate
                     >
                         {{ __('Tipos de personal') }}
@@ -71,8 +71,8 @@
 
                     <flux:sidebar.item
                         icon="building-office-2"
-                        :href="route('personal.personal.index')"
-                        :current="request()->routeIs('personal.personal.*')"
+                        :href="route('personnel.personnel.index')"
+                        :current="request()->routeIs('personnel.personnel.*')"
                         wire:navigate
                     >
                         {{ __('Personal') }}
@@ -80,8 +80,8 @@
 
                     <flux:sidebar.item
                         icon="cube"
-                        :href="route('personal.attendance.index')"
-                        :current="request()->routeIs('personal.attendance.*')"
+                        :href="route('personnel.attendance.index')"
+                        :current="request()->routeIs('personnel.attendance.*')"
                         wire:navigate
                     >
                         {{ __('Asistencias') }}
@@ -89,8 +89,8 @@
 
                     <flux:sidebar.item
                         icon="rectangle-stack"
-                        :href="route('personal.contracts.index')"
-                        :current="request()->routeIs('personal.contracts.*')"
+                        :href="route('personnel.contracts.index')"
+                        :current="request()->routeIs('personnel.contracts.*')"
                         wire:navigate
                     >
                         {{ __('Contratos') }}
@@ -98,8 +98,8 @@
 
                     <flux:sidebar.item
                         icon="rectangle-stack"
-                        :href="route('personal.vacations.index')"
-                        :current="request()->routeIs('personal.vacations.*')"
+                        :href="route('personnel.vacations.index')"
+                        :current="request()->routeIs('personnel.vacations.*')"
                         wire:navigate
                     >
                         {{ __('Vacaciones') }}
