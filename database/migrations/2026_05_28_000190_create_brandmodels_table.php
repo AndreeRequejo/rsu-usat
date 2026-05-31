@@ -14,12 +14,13 @@ return new class extends Migration
         Schema::create('brandmodels', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150);
-            $table->string('code', 50)->nullable();
+            $table->string('code', 50)->nullable()->unique();
             $table->text('description')->nullable();
             $table->foreignId('brand_id')
                 ->constrained('brands')
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
+            $table->unique(['name', 'brand_id']);
             $table->timestamps();
         });
     }

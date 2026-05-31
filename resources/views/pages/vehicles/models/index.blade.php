@@ -17,11 +17,17 @@ new class extends Component {
     public string $name = '';
     public string $description = '';
     public ?int $brand_id = null;
+    public string $code = '';
 
     protected function rules(): array
     {
+        $codeUnique = 'unique:brandmodels,code' . ($this->editingId ? ',' . $this->editingId : '');
+        $brandId = $this->brand_id ?? '0';
+        $nameBrandUnique = 'unique:brandmodels,name,' . ($this->editingId ?? 'NULL') . ',id,brand_id,' . $brandId;
+
         return [
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150', $nameBrandUnique],
+            'code' => ['nullable', 'string', 'max:50', $codeUnique],
             'description' => ['nullable', 'string'],
             'brand_id' => ['required', 'exists:brands,id'],
         ];
@@ -32,6 +38,8 @@ new class extends Component {
         return [
             'name.required' => __('El nombre es obligatorio.'),
             'name.max' => __('El nombre no puede tener mas de 150 caracteres.'),
+            'name.unique' => __('Ya existe un modelo con el mismo nombre para esta marca.'),
+            'code.unique' => __('El código ya está en uso.'),
             'brand_id.required' => __('La marca es obligatoria.'),
             'brand_id.exists' => __('La marca seleccionada no es válida.'),
         ];
@@ -46,9 +54,10 @@ new class extends Component {
             $model->update($validated);
             Flux::toast(variant: 'success', text: __('Modelo actualizado.'));
         } else {
-            // Auto-generación del código
-            $brand = Brand::find($this->brand_id);
-            $validated['code'] = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $this->name), 0, 3) . '-' . substr(preg_replace('/[^A-Za-z0-9]/', '', $brand->name), 0, 3) . '-' . date('y'));
+            if (empty($validated['code'])) {
+                $brand = Brand::find($this->brand_id);
+                $validated['code'] = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $this->name), 0, 3) . '-' . substr(preg_replace('/[^A-Za-z0-9]/', '', $brand->name), 0, 3) . '-' . date('y'));
+            }
 
             BrandModel::create($validated);
             Flux::toast(variant: 'success', text: __('Modelo creado.'));
@@ -74,6 +83,7 @@ new class extends Component {
         $model = BrandModel::findOrFail($id);
         $this->editingId = $model->id;
         $this->name = $model->name;
+        $this->code = $model->code ?? '';
         $this->description = $model->description ?? '';
         $this->brand_id = $model->brand_id;
         $this->showModal = true;
@@ -137,7 +147,7 @@ new class extends Component {
 
     private function resetForm(): void
     {
-        $this->reset(['name', 'description', 'brand_id', 'editingId']);
+        $this->reset(['name', 'code', 'description', 'brand_id', 'editingId']);
         $this->resetErrorBag();
         $this->resetValidation();
     }
@@ -223,7 +233,7 @@ new class extends Component {
                             <td class="px-6 py-4">
                                 <div class="flex justify-end gap-2">
                                     <button wire:click="openEdit({{ $model->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#F4C542] text-[#333333] hover:bg-[#D8AC34]"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#F4C542] hover:bg-[#F4C542]/20 transition"
                                             title="{{ __('Editar') }}"
                                             aria-label="{{ __('Editar') }}">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,7 +242,7 @@ new class extends Component {
                                         </svg>
                                     </button>
                                     <button wire:click="confirmDelete({{ $model->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#E53935] hover:bg-[#E53935]/20 transition"
                                             title="{{ __('Eliminar') }}"
                                             aria-label="{{ __('Eliminar') }}">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,11 +280,19 @@ new class extends Component {
                 </flux:text>
             </div>
 
-            <flux:input
-                wire:model="name"
-                :label="__('Nombre del Modelo')"
-                placeholder="{{ __('Ej. Corolla, F-150') }}"
-            />
+            <div class="grid grid-cols-2 gap-4">
+                <flux:input
+                    wire:model="code"
+                    :label="__('Código')"
+                    placeholder="{{ __('Ej. COR-TOY-25') }}"
+                />
+
+                <flux:input
+                    wire:model="name"
+                    :label="__('Nombre del Modelo')"
+                    placeholder="{{ __('Ej. Corolla, F-150') }}"
+                />
+            </div>
 
             <flux:select
                 wire:model="brand_id"
@@ -284,7 +302,7 @@ new class extends Component {
                 <x-slot:label>
                     {{ __('Marca') }}
                 </x-slot:label>
-                <option value="" disabled selected>{{ __('Seleccione una marca') }}</option>
+                <option value="" selected>{{ __('Seleccione una marca') }}</option>
                 @foreach ($this->brands as $brand)
                     <option value="{{ $brand->id }}">{{ $brand->name }}</option>
                 @endforeach
