@@ -185,9 +185,9 @@ new class extends Component {
             wire:click="openCreate"
             variant="primary"
             icon="plus-circle"
-            class="bg-[#2E8B57] text-white"
+            class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!"
         >
-            {{ __('Añadir Marca') }}
+            {{ __('Nueva Marca') }}
         </flux:button>
     </div>
 
