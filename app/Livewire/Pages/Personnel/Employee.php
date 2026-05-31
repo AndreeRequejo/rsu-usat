@@ -238,7 +238,7 @@ class Employee extends Component
     {
         if (!$this->deletingId) return;
 
-        $employee = Employee::findOrFail($this->deletingId);
+        $employee = EmployeeModel::findOrFail($this->deletingId);
 
         if ($employee->contracts()->exists()) {
             Flux::toast(variant: 'warning', text: 'No se puede eliminar el empleado porque tiene contratos asociados.');
