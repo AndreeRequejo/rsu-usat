@@ -11,6 +11,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('vehiculos/marcas', 'vehicles.brands.index')->name('vehicles.brands.index');
     Route::livewire('vehiculos/modelos', 'vehicles.models.index')->name('vehicles.models.index');
     Route::livewire('vehiculos/tipos', 'vehicles.types.index')->name('vehicles.types.index');
+    Route::livewire('personal/tipos', 'personal.types.index')->name('personal.types.index');
 });
 
 require __DIR__.'/settings.php';

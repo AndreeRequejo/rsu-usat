@@ -19,7 +19,7 @@
             </flux:sidebar.nav>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group expandable :heading="__('Gestión de vehículos')" icon="truck" class="grid">
+                <flux:sidebar.group expandable :heading="__('Gestión de Vehículos')" icon="truck" class="grid">
                     <flux:sidebar.item
                         icon="swatch"
                         :href="route('vehicles.colors')"
@@ -54,6 +54,55 @@
                         wire:navigate
                     >
                         {{ __('Tipo de vehículos') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            </flux:sidebar.nav>
+
+            <flux:sidebar.nav>
+                <flux:sidebar.group expandable :heading="__('Gestión de Personal')" icon="truck" class="grid">
+                    <flux:sidebar.item
+                        icon="swatch"
+                        :href="route('personal.types.index')"
+                        :current="request()->routeIs('personal.types.*')"
+                        wire:navigate
+                    >
+                        {{ __('Tipos de personal') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="building-office-2"
+                        :href="route('vehicles.brands.index')"
+                        :current="request()->routeIs('vehicles.brands.*')"
+                        wire:navigate
+                    >
+                        {{ __('Personal') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="cube"
+                        :href="route('vehicles.models.index')"
+                        :current="request()->routeIs('vehicles.models.index')"
+                        wire:navigate
+                    >
+                        {{ __('Asistencias') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="rectangle-stack"
+                        :href="route('vehicles.types.index')"
+                        :current="request()->routeIs('vehicles.types.*')"
+                        wire:navigate
+                    >
+                        {{ __('Contratos') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="rectangle-stack"
+                        :href="route('vehicles.types.index')"
+                        :current="request()->routeIs('vehicles.types.*')"
+                        wire:navigate
+                    >
+                        {{ __('Vacaciones') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>

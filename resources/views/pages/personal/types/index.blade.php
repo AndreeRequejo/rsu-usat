@@ -1,11 +1,12 @@
 <?php
 
-use App\Models\VehicleColor;
+use App\Models\PersonalType;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Flux\Flux;
+
 
 new class extends Component {
     use WithPagination;
@@ -15,7 +16,6 @@ new class extends Component {
     public ?int $editingId = null;
 
     public string $name = '';
-    public string $code = '#104CAD';
     public string $description = '';
 
     public ?int $deletingId = null;
@@ -24,80 +24,64 @@ new class extends Component {
     {
         return [
             'name' => [
-                'required',
-                'string',
-                'max:100',
-                Rule::unique('vehiclecolors', 'name')->ignore($this->editingId),
-            ],
-            'code' => [
-                'required',
-                'string',
-                'max:7',
-                'regex:/^#([A-Fa-f0-9]{6})$/',
-                Rule::unique('vehiclecolors', 'code')->ignore($this->editingId),
-            ],
+                'required', 
+                'string', 
+                'max:100', 
+                Rule::unique('usertypes', 'name')
+                ->ignore($this->editingId),],
             'description' => ['nullable', 'string'],
+            
         ];
     }
-
     protected function messages(): array
     {
         return [
             'name.required' => __('El nombre es obligatorio.'),
             'name.string' => __('El nombre debe ser un texto.'),
             'name.max' => __('El nombre no puede tener más de 100 caracteres.'),
-            'name.unique' => __('Ya existe un color con ese nombre.'),
-            'code.required' => __('El código del color es obligatorio.'),
-            'code.string' => __('El código del color debe ser un texto.'),
-            'code.max' => __('El código del color no puede tener más de 7 caracteres.'),
-            'code.regex' => __('El código debe tener formato hexadecimal, por ejemplo #104CAD.'),
-            'code.unique' => __('Ya existe un color con ese código.'),
-            'description.string' => __('La descripción debe ser un texto.'),
+            'name.unique' => __('Ya existe un tipo de personal con ese nombre.'), 
         ];
     }
-
     public function save(): void
     {
         $validated = $this->validate();
-        $validated['code'] = strtoupper($validated['code']);
 
         if ($this->editingId) {
-            $vehicleColor = VehicleColor::findOrFail($this->editingId);
-            $vehicleColor->update($validated);
-            Flux::toast(variant: 'success', text: __('Color actualizado.'));
+            $personalType = PersonalType::findOrFail($this->editingId);
+            $personalType->update($validated);
+            Flux::toast(variant: 'success', text: __('Tipo de personal actualizado.'));
         } else {
-            VehicleColor::create($validated);
-            Flux::toast(variant: 'success', text: __('Color creado.'));
+            PersonalType::create($validated);
+            Flux::toast(variant: 'success', text: __('Tipo de personal creado.'));
         }
 
         $this->resetForm();
         $this->showModal = false;
-        Flux::modal('vehicle-color-form')->close();
+        Flux::modal('personal-type-form')->close();
     }
 
     public function openCreate(): void
     {
         $this->resetForm();
         $this->showModal = true;
-        Flux::modal('vehicle-color-form')->show();
+        Flux::modal('personal-type-form')->show();
     }
 
     public function openEdit(int $id): void
     {
-        $vehicleColor = VehicleColor::findOrFail($id);
-        $this->editingId = $vehicleColor->id;
-        $this->name = $vehicleColor->name;
-        $this->code = $vehicleColor->code;
-        $this->description = $vehicleColor->description ?? '';
+        $personalType = PersonalType::findOrFail($id);
+        $this->editingId = $personalType->id;
+        $this->name = $personalType->name;
+        $this->description = $personalType->description ?? '';
         $this->showModal = true;
-        Flux::modal('vehicle-color-form')->show();
+        Flux::modal('personal-type-form')->show();
     }
 
     public function closeModal(): void
     {
         $this->resetForm();
         $this->showModal = false;
-        Flux::modal('vehicle-color-form')->close();
+        Flux::modal('personal-type-form')->close();
     }
 
     public function confirmDelete(int $id): void
@@ -110,9 +94,9 @@ new class extends Component {
     {
         if (!$this->deletingId) return;
 
-        $vehicleColor = VehicleColor::findOrFail($this->deletingId);
-        $vehicleColor->delete();
-        Flux::toast(variant: 'success', text: __('Color eliminado.'));
+        $personalType = PersonalType::findOrFail($this->deletingId);
+        $personalType->delete();
+        Flux::toast(variant: 'success', text: __('Tipo de personal eliminado.'));
 
         if ($this->editingId === $this->deletingId) {
             $this->resetForm();
@@ -122,12 +106,11 @@ new class extends Component {
     }
 
     #[Computed]
-    public function colors()
+    public function personalTypes()
     {
-        return VehicleColor::query()
+        return PersonalType::query()
             ->when($this->search !== '', function ($query) {
                 $query->where('name', 'like', '%'.$this->search.'%')
-                    ->orWhere('code', 'like', '%'.$this->search.'%')
                     ->orWhere('description', 'like', '%'.$this->search.'%');
             })
             ->orderBy('name')
@@ -141,8 +124,7 @@ new class extends Component {
 
     private function resetForm(): void
     {
-        $this->reset(['name', 'code', 'description', 'editingId']);
-        $this->code = '#104CAD';
+        $this->reset(['name', 'description', 'editingId']);
         $this->resetErrorBag();
         $this->resetValidation();
     }
@@ -152,10 +134,10 @@ new class extends Component {
     <div class="flex items-start justify-between mb-6">
         <div>
             <h1 class="text-3xl font-bold text-[#2E8B57]">
-                {{ __('Gestión de Colores') }}
+                {{ __('Gestion de tipos de personal') }}
             </h1>
             <p class="text-sm text-[#333333] mt-1">
-                {{ __('Administración de colores registrados para la flota vehicular.') }}
+                {{ __('Administracion de tipos de personal disponibles para la recolección de basura.') }}
             </p>
         </div>
 
@@ -165,13 +147,13 @@ new class extends Component {
             icon="plus-circle"
             class="bg-[#2E8B57] text-white"
         >
-            {{ __('Nuevo Color') }}
+            {{ __('Anadir Tipo') }}
         </flux:button>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-[#A5D6A7] p-5 mb-6">
         <label class="block text-sm font-medium text-[#333333] mb-2">
-            {{ __('Buscar por nombre, código o descripción') }}
+            {{ __('Buscar por nombre o descripcion') }}
         </label>
         <div class="flex gap-3">
             <div class="relative flex-1">
@@ -196,32 +178,24 @@ new class extends Component {
             <table class="w-full">
                 <thead>
                     <tr class="bg-[#2E8B57] text-white text-xs font-bold uppercase tracking-wider">
-                        <th class="px-6 py-4 text-left">{{ __('Color') }}</th>
                         <th class="px-6 py-4 text-left">{{ __('Nombre') }}</th>
-                        <th class="px-6 py-4 text-left">{{ __('Código') }}</th>
-                        <th class="px-6 py-4 text-left">{{ __('Descripción') }}</th>
+                        <th class="px-6 py-4 text-left">{{ __('Descripcion') }}</th>
                         <th class="px-6 py-4 text-right">{{ __('Acciones') }}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($this->colors as $i => $color)
-                        <tr wire:key="vehicle-color-{{ $color->id }}"
+                    @forelse ($this->personalTypes as $i => $personalType)
+                        <tr wire:key="personal-type-{{ $personalType->id }}"
                             class="{{ $i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20' }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition">
-                            <td class="px-6 py-4">
-                                <div class="h-8 w-8 rounded-md ring-1 ring-black/10" style="background-color: {{ $color->code }};"></div>
-                            </td>
                             <td class="px-6 py-4 text-sm font-bold text-[#333333] uppercase">
-                                {{ $color->name }}
-                            </td>
-                            <td class="px-6 py-4 text-sm text-[#666666] font-mono">
-                                {{ $color->code }}
+                                {{ $personalType->name }}
                             </td>
                             <td class="px-6 py-4 text-sm text-[#333333]">
-                                {{ $color->description ?: __('Sin descripción') }}
+                                {{ $personalType->description ?: __('Sin descripcion') }}
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex justify-end gap-2">
-                                    <button wire:click="openEdit({{ $color->id }})"
+                                    <button wire:click="openEdit({{ $personalType->id }})"
                                             class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#F4C542] text-[#333333] hover:bg-[#D8AC34]"
                                             title="{{ __('Editar') }}"
                                             aria-label="{{ __('Editar') }}">
@@ -230,7 +204,7 @@ new class extends Component {
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 7.5L16.5 4.5" />
                                         </svg>
                                     </button>
-                                    <button wire:click="confirmDelete({{ $color->id }})"
+                                    <button wire:click="confirmDelete({{ $personalType->id }})"
                                             class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
                                             title="{{ __('Eliminar') }}"
                                             aria-label="{{ __('Eliminar') }}">
@@ -243,8 +217,8 @@ new class extends Component {
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-10 text-center text-sm text-[#333333]">
-                                {{ __('No hay colores registrados.') }}
+                            <td colspan="3" class="px-6 py-10 text-center text-sm text-[#333333]">
+                                {{ __('No hay tipos de personal registrados.') }}
                             </td>
                         </tr>
                     @endforelse
@@ -253,59 +227,36 @@ new class extends Component {
         </div>
 
         <div class="px-6 py-4 border-t border-[#A5D6A7]">
-            {{ $this->colors->links() }}
+            {{ $this->personalTypes->links() }}
         </div>
     </div>
 
-    <flux:modal name="vehicle-color-form" wire:close="closeModal" class="md:w-130">
+    <flux:modal name="personal-type-form" wire:close="closeModal" class="md:w-[520px]">
         <form wire:submit="save" class="space-y-6" novalidate>
             <div>
                 <flux:heading size="lg">
-                    {{ $editingId ? __('Editar color') : __('Nuevo color') }}
+                    {{ $editingId ? __('Editar tipo de personal') : __('Nuevo tipo de personal') }}
                 </flux:heading>
                 <flux:text class="mt-2">
-                    {{ __('Ingresa el nombre, el código hexadecimal y una descripción opcional.') }}
+                    {{ __('Ingresa el nombre y una descripcion opcional.') }}
                 </flux:text>
             </div>
 
             <flux:input
-                wire:model.live="name"
-                :label="__('Nombre del Color')"
-                placeholder="{{ __('Ej. Azul, Gris, Blanco') }}"
+                wire:model="name"
+                :label="__('Nombre')"
+                placeholder="{{ __('Nombre del tipo de personal') }}"
+                required
             />
-
-            <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-                <flux:input
-                    wire:model.live="code"
-                    :label="__('Código del Color (RGB)')"
-                    placeholder="#104CAD"
-                />
-
-                <label class="block">
-                    <span class="sr-only">{{ __('Selector de color') }}</span>
-                    <input
-                        type="color"
-                        wire:model.live="code"
-                        class="h-10 w-14 cursor-pointer rounded-md border border-zinc-200 bg-white p-1"
-                        aria-label="{{ __('Selector de color') }}"
-                    />
-                </label>
-            </div>
-
-            <div class="rounded-lg border border-[#A5D6A7] p-3" x-data="{ code: @entangle('code').live }">
-                <div class="text-sm font-medium text-[#333333] mb-2">{{ __('Vista Previa del Color:') }}</div>
-                <div class="h-16 rounded-lg flex items-center justify-center text-white font-bold shadow-sm" :style="`background-color: ${code}`">
-                    <span x-text="code"></span>
-                </div>
-            </div>
 
             <flux:textarea
-                wire:model.live="description"
-                :label="__('Descripción')"
-                placeholder="{{ __('Agregue una descripción del color') }}"
+                wire:model="description"
+                :label="__('Descripcion')"
+                rows="3"
+                placeholder="{{ __('Descripcion') }}"
             />
 
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="flex justify-end gap-2">
                 <flux:modal.close>
                     <flux:button type="button" variant="ghost" wire:click="closeModal" class="text-[#333333]">
                         {{ __('Cancelar') }}
@@ -326,7 +277,7 @@ new class extends Component {
                     {{ __('Confirmar eliminación') }}
                 </flux:heading>
                 <flux:text class="mt-2 text-sm text-[#333333]">
-                    {{ __('¿Estás seguro de que deseas eliminar este color? Esta acción no se puede deshacer.') }}
+                    {{ __('¿Estás seguro de que deseas eliminar este tipo de personal? Esta acción no se puede deshacer.') }}
                 </flux:text>
             </div>
 
