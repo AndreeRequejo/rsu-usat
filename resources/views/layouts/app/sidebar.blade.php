@@ -71,8 +71,8 @@
 
                     <flux:sidebar.item
                         icon="building-office-2"
-                        :href="route('vehicles.brands.index')"
-                        :current="request()->routeIs('vehicles.brands.*')"
+                        :href="route('personal.personal.index')"
+                        :current="request()->routeIs('personal.personal.*')"
                         wire:navigate
                     >
                         {{ __('Personal') }}
@@ -80,8 +80,8 @@
 
                     <flux:sidebar.item
                         icon="cube"
-                        :href="route('vehicles.models.index')"
-                        :current="request()->routeIs('vehicles.models.index')"
+                        :href="route('personal.attendance.index')"
+                        :current="request()->routeIs('personal.attendance.*')"
                         wire:navigate
                     >
                         {{ __('Asistencias') }}
@@ -89,8 +89,8 @@
 
                     <flux:sidebar.item
                         icon="rectangle-stack"
-                        :href="route('vehicles.types.index')"
-                        :current="request()->routeIs('vehicles.types.*')"
+                        :href="route('personal.contracts.index')"
+                        :current="request()->routeIs('personal.contracts.*')"
                         wire:navigate
                     >
                         {{ __('Contratos') }}
@@ -98,8 +98,8 @@
 
                     <flux:sidebar.item
                         icon="rectangle-stack"
-                        :href="route('vehicles.types.index')"
-                        :current="request()->routeIs('vehicles.types.*')"
+                        :href="route('personal.vacations.index')"
+                        :current="request()->routeIs('personal.vacations.*')"
                         wire:navigate
                     >
                         {{ __('Vacaciones') }}

@@ -67,25 +67,25 @@
                     <span>Tipos de Personal</span>
                 </a>
 
-                <a href="{{ route('vehicles.brands.index') }}"
+                <a href="{{ route('personal.personal.index') }}"
                    class="bg-gray-100 rounded-xl shadow p-5 hover:bg-green-50 transition flex flex-col items-center justify-center gap-2">
                     <i class="fas fa-tags fa-2x text-green-500"></i>
                     <span>Personal</span>
                 </a>
 
-                <a href="{{ route('vehicles.models.index') }}"
+                <a href="{{ route('personal.attendance.index') }}"
                    class="bg-gray-100 rounded-xl shadow p-5 hover:bg-green-50 transition flex flex-col items-center justify-center gap-2">
                     <i class="fas fa-car-side fa-2x text-green-500"></i>
                     <span>Asistencia</span>
                 </a>
 
-                <a href="{{ route('vehicles.models.index') }}"
+                <a href="{{ route('personal.contracts.index') }}"
                    class="bg-gray-100 rounded-xl shadow p-5 hover:bg-green-50 transition flex flex-col items-center justify-center gap-2">
                     <i class="fas fa-car-side fa-2x text-green-500"></i>
-                    <span>Contrato</span>
+                    <span>Contratos</span>
                 </a>
                 
-                <a href="{{ route('vehicles.models.index') }}"
+                <a href="{{ route('personal.vacations.index') }}"
                    class="bg-gray-100 rounded-xl shadow p-5 hover:bg-green-50 transition flex flex-col items-center justify-center gap-2">
                     <i class="fas fa-car-side fa-2x text-green-500"></i>
                     <span>Vacaciones</span>
