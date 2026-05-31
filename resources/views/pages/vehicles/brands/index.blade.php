@@ -348,7 +348,7 @@ new class extends Component {
     </flux:modal>
 
     {{-- Modal confirmar eliminación --}}
-    <flux:modal name="confirm-delete" class="md:w-[400px]">
+    <flux:modal name="confirm-delete" class="md:w-100">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg" class="text-red-500">

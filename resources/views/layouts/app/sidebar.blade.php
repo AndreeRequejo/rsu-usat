@@ -21,12 +21,21 @@
             <flux:sidebar.nav>
                 <flux:sidebar.group expandable :heading="__('Gestión de Vehículos')" icon="truck" class="grid">
                     <flux:sidebar.item
-                        icon="swatch"
-                        :href="route('vehicles.colors')"
-                        :current="request()->routeIs('vehicles.colors')"
+                        icon="truck"
+                        :href="route('vehicles.vehicles.index')"
+                        :current="request()->routeIs('vehicles.vehicles.*')"
                         wire:navigate
                     >
-                        {{ __('Colores') }}
+                        {{ __('Vehículos') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="rectangle-stack"
+                        :href="route('vehicles.types.index')"
+                        :current="request()->routeIs('vehicles.types.*')"
+                        wire:navigate
+                    >
+                        {{ __('Tipos') }}
                     </flux:sidebar.item>
 
                     <flux:sidebar.item
@@ -48,29 +57,29 @@
                     </flux:sidebar.item>
 
                     <flux:sidebar.item
-                        icon="rectangle-stack"
-                        :href="route('vehicles.types.index')"
-                        :current="request()->routeIs('vehicles.types.*')"
+                        icon="swatch"
+                        :href="route('vehicles.colors')"
+                        :current="request()->routeIs('vehicles.colors')"
                         wire:navigate
                     >
-                        {{ __('Tipo de vehículos') }}
+                        {{ __('Colores') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group expandable :heading="__('Gestión de Personal')" icon="truck" class="grid">
+                <flux:sidebar.group expandable :heading="__('Gestión de Personal')" icon="user-group" class="grid">
                     <flux:sidebar.item
-                        icon="swatch"
+                        icon="queue-list"
                         :href="route('personnel.types.index')"
                         :current="request()->routeIs('personnel.types.*')"
                         wire:navigate
                     >
-                        {{ __('Tipos de personal') }}
+                        {{ __('Tipos') }}
                     </flux:sidebar.item>
 
                     <flux:sidebar.item
-                        icon="building-office-2"
+                        icon="user"
                         :href="route('personnel.personnel.index')"
                         :current="request()->routeIs('personnel.personnel.*')"
                         wire:navigate
@@ -79,16 +88,7 @@
                     </flux:sidebar.item>
 
                     <flux:sidebar.item
-                        icon="cube"
-                        :href="route('personnel.attendance.index')"
-                        :current="request()->routeIs('personnel.attendance.*')"
-                        wire:navigate
-                    >
-                        {{ __('Asistencias') }}
-                    </flux:sidebar.item>
-
-                    <flux:sidebar.item
-                        icon="rectangle-stack"
+                        icon="document-text"
                         :href="route('personnel.contracts.index')"
                         :current="request()->routeIs('personnel.contracts.*')"
                         wire:navigate
@@ -97,7 +97,16 @@
                     </flux:sidebar.item>
 
                     <flux:sidebar.item
-                        icon="rectangle-stack"
+                        icon="check-badge"
+                        :href="route('personnel.attendance.index')"
+                        :current="request()->routeIs('personnel.attendance.*')"
+                        wire:navigate
+                    >
+                        {{ __('Asistencias') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="arrow-left-end-on-rectangle"
                         :href="route('personnel.vacations.index')"
                         :current="request()->routeIs('personnel.vacations.*')"
                         wire:navigate
