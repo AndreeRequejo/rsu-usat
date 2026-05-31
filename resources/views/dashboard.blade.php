@@ -8,7 +8,7 @@
 
                 <div>
                     <h1 class="text-3xl font-bold">
-                        Sistema RSU - USAT
+                        Sistema RSU - Universidad Católica Santo Toribio de Mogrovejo
                     </h1>
 
                     <p class="mt-2 text-green-100">
