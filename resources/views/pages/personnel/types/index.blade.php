@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\PersonalType;
+use App\Models\EmployeeType;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
@@ -29,7 +29,7 @@ new class extends Component {
                 'required', 
                 'string', 
                 'max:100', 
-                Rule::unique('usertypes', 'name')
+                Rule::unique('employee_types', 'name')
                 ->ignore($this->editingId),],
             'description' => ['nullable', 'string'],
             
@@ -49,11 +49,11 @@ new class extends Component {
         $validated = $this->validate();
 
         if ($this->editingId) {
-            $personalType = PersonalType::findOrFail($this->editingId);
+            $personalType = EmployeeType::findOrFail($this->editingId);
             $personalType->update($validated);
             Flux::toast(variant: 'success', text: __('Tipo de personal actualizado.'));
         } else {
-            PersonalType::create($validated);
+            EmployeeType::create($validated);
             Flux::toast(variant: 'success', text: __('Tipo de personal creado.'));
         }
 
@@ -71,10 +71,10 @@ new class extends Component {
 
     public function openEdit(int $id): void
     {
-        $personalType = PersonalType::findOrFail($id);
-        $this->editingId = $personalType->id;
-        $this->name = $personalType->name;
-        $this->description = $personalType->description ?? '';
+        $employeeType = EmployeeType::findOrFail($id);
+        $this->editingId = $employeeType->id;
+        $this->name = $employeeType->name;
+        $this->description = $employeeType->description ?? '';
         $this->showModal = true;
         Flux::modal('personal-type-form')->show();
     }
@@ -88,8 +88,8 @@ new class extends Component {
 
     public function confirmDelete(int $id): void
     {
-        $personalType = PersonalType::findOrFail($id);
-        if ($this->isProtected($personalType)) {
+        $employeeType = EmployeeType::findOrFail($id);
+        if ($this->isProtected($employeeType)) {
             Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
             return;
         }
@@ -101,14 +101,14 @@ new class extends Component {
     {
         if (!$this->deletingId) return;
 
-        $personalType = PersonalType::findOrFail($this->deletingId);
-        if ($this->isProtected($personalType)) {
+        $employeeType = EmployeeType::findOrFail($this->deletingId);
+        if ($this->isProtected($employeeType)) {
             Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
             return;
         }
-        $personalType->delete();
+        $employeeType->delete();
         Flux::toast(variant: 'success', text: __('Tipo de personal eliminado.'));
 
         if ($this->editingId === $this->deletingId) {
@@ -121,7 +121,7 @@ new class extends Component {
     #[Computed]
     public function personalTypes()
     {
-        return PersonalType::query()
+        return EmployeeType::query()
             ->when($this->search !== '', function ($query) {
                 $query->where('name', 'like', '%'.$this->search.'%')
                     ->orWhere('description', 'like', '%'.$this->search.'%');
@@ -135,9 +135,9 @@ new class extends Component {
         $this->resetPage();
     }
 
-    public function isProtected(PersonalType $personalType): bool
+    public function isProtected(EmployeeType $employeeType): bool
     {
-        return in_array($personalType->name, self::PROTECTED_NAMES, true);
+        return in_array($employeeType->name, self::PROTECTED_NAMES, true);
     }
 
     private function resetForm(): void
@@ -251,7 +251,7 @@ new class extends Component {
         </div>
     </div>
 
-    <flux:modal name="personal-type-form" wire:close="closeModal" class="md:w-[520px]">
+    <flux:modal name="personal-type-form" wire:close="closeModal" class="md:w-130">
         <form wire:submit="save" class="space-y-6" novalidate>
             <div>
                 <flux:heading size="lg">
@@ -290,7 +290,7 @@ new class extends Component {
     </flux:modal>
 
     {{-- Modal confirmar eliminación --}}
-    <flux:modal name="confirm-delete" class="md:w-[400px]">
+    <flux:modal name="confirm-delete" class="md:w-100">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg" class="text-red-500">

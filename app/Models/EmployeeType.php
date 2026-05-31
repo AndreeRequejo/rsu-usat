@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PersonalType extends Model
+class EmployeeType extends Model
 {
-    protected $table = 'usertypes';
+    protected $table = 'employee_types';
 
     protected $fillable = [
         'name',
