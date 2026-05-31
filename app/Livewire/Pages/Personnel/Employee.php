@@ -240,8 +240,22 @@ class Employee extends Component
 
         $employee = EmployeeModel::findOrFail($this->deletingId);
 
-        if ($employee->contracts()->exists()) {
-            Flux::toast(variant: 'warning', text: 'No se puede eliminar el empleado porque tiene contratos asociados.');
+        $activeContractsCount = $employee->contracts()->where('is_active', true)->count();
+        if ($activeContractsCount > 0) {
+            $employeeName = trim("{$employee->last_name} {$employee->first_name}");
+            Flux::toast(
+                variant: 'warning',
+                text: "El empleado {$employeeName} tiene contratos activos."
+            );
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
+
+        $hasAnyContracts = $employee->contracts()->exists();
+        if ($hasAnyContracts) {
+            $employee->update(['active' => false]);
+            Flux::toast(variant: 'success', text: 'Empleado desactivado correctamente.');
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
             return;
