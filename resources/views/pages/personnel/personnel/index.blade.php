@@ -4,7 +4,7 @@
             <h1 class="text-3xl font-bold text-[#2E8B57]">Gestion de personal</h1>
             <p class="text-sm text-[#333333] mt-1">Administracion de empleados de la organizacion.</p>
         </div>
-        <flux:button wire:click="openCreate" variant="primary" icon="plus-circle" class="bg-[#2E8B57] text-white">
+        <flux:button wire:click="openCreate" variant="primary" icon="plus-circle" class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!">
             Nuevo Empleado
         </flux:button>
     </div>
