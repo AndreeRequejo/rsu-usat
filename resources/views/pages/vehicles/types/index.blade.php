@@ -190,21 +190,15 @@ new class extends Component {
                             <td class="px-6 py-4 text-sm text-[#333333]">
                                 {{ $vehicleType->description ?: __('Sin descripcion') }}
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-3">
                                 <div class="flex justify-end gap-2">
-                                    <button wire:click="openEdit({{ $vehicleType->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#F4C542] text-[#333333] hover:bg-[#D8AC34]"
-                                            title="{{ __('Editar') }}"
-                                            aria-label="{{ __('Editar') }}">
+                                    <button wire:click="openEdit({{ $vehicleType->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#F4C542] hover:bg-[#F4C542]/20 transition" title="Editar" aria-label="Editar">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 3.487a2.25 2.25 0 013.182 3.182l-9.193 9.193a4.5 4.5 0 01-1.897 1.13l-3.17 1.056 1.056-3.17a4.5 4.5 0 011.13-1.897l9.193-9.193z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 7.5L16.5 4.5" />
                                         </svg>
                                     </button>
-                                    <button wire:click="confirmDelete({{ $vehicleType->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
-                                            title="{{ __('Eliminar') }}"
-                                            aria-label="{{ __('Eliminar') }}">
+                                    <button wire:click="confirmDelete({{ $vehicleType->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#E53935] hover:bg-[#E53935]/20 transition" title="Eliminar" aria-label="Eliminar">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
                                         </svg>
@@ -266,25 +260,22 @@ new class extends Component {
         </form>
     </flux:modal>
 
-    {{-- Modal confirmar eliminación --}}
-    <flux:modal name="confirm-delete" class="md:w-[400px]">
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg" class="text-red-500">
-                    {{ __('Confirmar eliminación') }}
-                </flux:heading>
-                <flux:text class="mt-2 text-sm text-[#333333]">
-                    {{ __('¿Estás seguro de que deseas eliminar este tipo de vehículo? Esta acción no se puede deshacer.') }}
-                </flux:text>
+    <flux:modal name="confirm-delete" class="md:w-100">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4 px-6 pt-4">
+                <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg class="h-5 w-5 text-[#E53935]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <flux:heading size="lg" class="text-[#E53935]">Confirmar eliminacion</flux:heading>
+                    <flux:text class="mt-1 text-sm text-[#666666]">¿Está seguro de que desea eliminar este tipo de vehículo? Esta acción no se puede deshacer.</flux:text>
+                </div>
             </div>
-
-            <div class="flex gap-3 justify-end pt-4 border-t border-[#E0E0E0]">
-                <flux:button x-on:click="Flux.modal('confirm-delete').close()" type="button">
-                    {{ __('Cancelar') }}
-                </flux:button>
-                <flux:button wire:click="delete" variant="danger" class="bg-[#E53935] text-white">
-                    {{ __('Eliminar') }}
-                </flux:button>
+            <div class="px-6 py-4 bg-[#F5F5F5] border-t border-[#E0E0E0] flex justify-end gap-3">
+                <flux:button x-on:click="Flux.modal('confirm-delete').close()" type="button" variant="ghost" class="text-[#333333]">Cancelar</flux:button>
+                <flux:button wire:click="delete" variant="danger" class="bg-[#E53935] text-white hover:bg-[#C62828]">Eliminar</flux:button>
             </div>
         </div>
     </flux:modal>
