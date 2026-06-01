@@ -86,6 +86,15 @@ new class extends Component {
 
     public function confirmDelete(int $id): void
     {
+        $vehicleType = VehicleType::findOrFail($id);
+        $assignedCount = $this->assignedCount($vehicleType);
+        if ($assignedCount > 0) {
+            Flux::toast(
+                variant: 'warning',
+                text: __('No se puede eliminar este tipo de vehiculo porque tiene :count vehículo(s) asignados.', ['count' => $assignedCount])
+            );
+            return;
+        }
         $this->deletingId = $id;
         Flux::modal('confirm-delete')->show();
     }
@@ -95,6 +104,16 @@ new class extends Component {
         if (!$this->deletingId) return;
 
         $vehicleType = VehicleType::findOrFail($this->deletingId);
+        $assignedCount = $this->assignedCount($vehicleType);
+        if ($assignedCount > 0) {
+            Flux::toast(
+                variant: 'warning',
+                text: __('No se puede eliminar este tipo de vehiculo porque tiene :count vehículo(s) asignados.', ['count' => $assignedCount])
+            );
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
         $vehicleType->delete();
         Flux::toast(variant: 'success', text: __('Tipo de vehiculo eliminado.'));
 
@@ -127,6 +146,11 @@ new class extends Component {
         $this->reset(['name', 'description', 'editingId']);
         $this->resetErrorBag();
         $this->resetValidation();
+    }
+
+    private function assignedCount(VehicleType $vehicleType): int
+    {
+        return $vehicleType->vehicles()->count();
     }
 }; ?>
 

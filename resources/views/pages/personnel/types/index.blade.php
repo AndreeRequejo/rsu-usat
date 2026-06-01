@@ -93,6 +93,14 @@ new class extends Component {
             Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
             return;
         }
+        $assignedCount = $this->assignedCount($employeeType);
+        if ($assignedCount > 0) {
+            Flux::toast(
+                variant: 'warning',
+                text: __('No se puede eliminar este tipo de personal porque tiene :count persona(s) asignadas.', ['count' => $assignedCount])
+            );
+            return;
+        }
         $this->deletingId = $id;
         Flux::modal('confirm-delete')->show();
     }
@@ -104,6 +112,16 @@ new class extends Component {
         $employeeType = EmployeeType::findOrFail($this->deletingId);
         if ($this->isProtected($employeeType)) {
             Flux::toast(variant: 'warning', text: __('Este tipo de personal no se puede eliminar.'));
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
+        $assignedCount = $this->assignedCount($employeeType);
+        if ($assignedCount > 0) {
+            Flux::toast(
+                variant: 'warning',
+                text: __('No se puede eliminar este tipo de personal porque tiene :count persona(s) asignadas.', ['count' => $assignedCount])
+            );
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
             return;
@@ -138,6 +156,11 @@ new class extends Component {
     public function isProtected(EmployeeType $employeeType): bool
     {
         return in_array($employeeType->name, self::PROTECTED_NAMES, true);
+    }
+
+    private function assignedCount(EmployeeType $employeeType): int
+    {
+        return $employeeType->employees()->count();
     }
 
     private function resetForm(): void
