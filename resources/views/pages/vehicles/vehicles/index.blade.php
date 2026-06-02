@@ -47,7 +47,7 @@ new class extends Component {
         return [
             'name' => ['required', 'string', 'max:150', Rule::unique('vehicles', 'name')->ignore($this->editingId)],
             'code' => ['required', 'string', 'max:50', Rule::unique('vehicles', 'code')->ignore($this->editingId)],
-            'plate' => ['required', 'string', 'max:20', Rule::unique('vehicles', 'plate')->ignore($this->editingId)],
+            'plate' => ['required', 'string', Rule::unique('vehicles', 'plate')->ignore($this->editingId), 'regex:/^([A-Z0-9]{6}|[A-Z0-9]{2}-[A-Z0-9]{4}|[A-Z0-9]{3}-[A-Z0-9]{3})$/'],
             'year' => ['required', 'integer', 'min:1900', 'max:' . (date('Y') + 1)],
             'occupant_capacity' => ['required', 'integer', 'min:1'],
             'load_capacity' => ['required', 'numeric', 'min:0'],
@@ -75,6 +75,8 @@ new class extends Component {
             // Placa
             'plate.required' => __('La placa es obligatoria.'),
             'plate.unique' => __('Ya existe un vehículo registrado con esa placa.'),
+            'plate.regex' => __('La placa debe tener uno de estos formatos: XXXXXX, XX-XXXX o XXX-XXX.'),
+            //'plate.max' => __('La placa no puede tener más de 6 caracteres.'),
             // Año
             'year.required' => __('El año es obligatorio.'),
             'year.integer' => __('El año debe ser un número válido.'),
@@ -654,7 +656,7 @@ new class extends Component {
 
                         <div class="flex gap-3 pb-2">
                             @foreach ($this->vehicleImages as $image)
-                                <label class=" cursor-pointer">
+                                <label class="relative cursor-pointer">
                                     <input type="radio" wire:model.live="profileImageId"
                                         value="{{ $image->id }}" class="hidden peer">
                                     <button type="button" wire:click="deleteImage({{ $image->id }})"
