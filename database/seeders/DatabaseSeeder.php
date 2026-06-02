@@ -5,6 +5,10 @@ namespace Database\Seeders;
 use App\Models\EmployeeType;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Database\Seeders\BrandSeeder;
+use Database\Seeders\BrandModelSeeder;
+use Database\Seeders\VehicleColorSeeder;
+use Database\Seeders\VehicleTypeSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -25,5 +29,12 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Ayudante'],
             ['description' => 'Personal de apoyo en la recoleccion.']
         );
+
+        $this->call([
+            VehicleTypeSeeder::class,
+            BrandSeeder::class,
+            BrandModelSeeder::class,
+            VehicleColorSeeder::class,
+        ]);
     }
 }

@@ -5,20 +5,32 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Vehicle extends Model
 {
     protected $table = 'vehicles';
 
     protected $fillable = [
+        'name',
+        'code',
+        'plate',
+        'year',
+        'occupant_capacity',
+        'load_capacity',
+        'description',
+        'status',
         'brand_id',
         'model_id',
-        'color_id',
-        'license_plate',
-        'year',
         'type_id',
-        'capacity',
-        'status',
+        'color_id',
+    ];
+
+    protected $casts = [
+        'year' => 'integer',
+        'occupant_capacity' => 'integer',
+        'load_capacity' => 'decimal:2',
+        'status' => 'boolean',
     ];
 
     public function brand(): BelongsTo
@@ -49,5 +61,15 @@ class Vehicle extends Model
     public function maintenanceSchedules(): HasMany
     {
         return $this->hasMany(MaintenanceSchedule::class);
+    }
+
+    public function vehicleImages(): HasMany
+    {
+        return $this->hasMany(VehicleImage::class);
+    }
+    public function profileImage(): HasOne
+    {
+        return $this->hasOne(VehicleImage::class, 'vehicle_id')
+            ->where('profile', true);
     }
 }
