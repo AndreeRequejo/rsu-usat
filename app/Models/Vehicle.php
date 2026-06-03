@@ -67,6 +67,7 @@ class Vehicle extends Model
     {
         return $this->hasMany(VehicleImage::class);
     }
+
     public function profileImage(): HasOne
     {
         return $this->hasOne(VehicleImage::class, 'vehicle_id')

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->date('start_date');
             $table->date('end_date')->nullable();
             $table->decimal('salary', 10, 2);
-            $table->foreignId('department_id') ->nullable() ->constrained('departments')->cascadeOnDelete();
+            $table->foreignId('department_id')->nullable()->constrained('departments')->cascadeOnDelete();
             $table->integer('vacation_days_per_year')->default(30);
             $table->integer('probation_period_months')->default(0);
             $table->boolean('is_active')->default(true);
