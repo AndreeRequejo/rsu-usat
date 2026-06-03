@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Contract;
+use App\Observers\ContractObserver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     {
         View::addNamespace('pages', resource_path('views/pages'));
         $this->configureDefaults();
+        Contract::observe(ContractObserver::class);
     }
 
     /**

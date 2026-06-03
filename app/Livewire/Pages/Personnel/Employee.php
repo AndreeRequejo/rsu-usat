@@ -4,33 +4,47 @@ namespace App\Livewire\Pages\Personnel;
 
 use App\Models\Employee as EmployeeModel;
 use App\Models\EmployeeType;
+use App\Models\User;
+use Flux\Flux;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
-use Flux\Flux;
 
 class Employee extends Component
 {
-    use WithPagination;
     use WithFileUploads;
+    use WithPagination;
 
     public string $search = '';
+
     public bool $showFormModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deletingId = null;
 
     public string $dni = '';
+
     public int $employee_type_id = 0;
+
     public string $first_name = '';
+
     public string $last_name = '';
+
     public string $birthdate = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $address = '';
+
     public string $phone = '';
+
     public $photo = null;
+
     public bool $active = true;
 
     protected function rules(): array
@@ -88,10 +102,10 @@ class Employee extends Component
             ->with(['employeeType', 'user', 'employeeImages'])
             ->when($this->search !== '', function ($query) {
                 $query->where(function ($q) {
-                    $q->where('dni', 'like', '%' . $this->search . '%')
-                        ->orWhere('first_name', 'like', '%' . $this->search . '%')
-                        ->orWhere('last_name', 'like', '%' . $this->search . '%')
-                        ->orWhereHas('user', fn($uq) => $uq->where('email', 'like', '%' . $this->search . '%'));
+                    $q->where('dni', 'like', '%'.$this->search.'%')
+                        ->orWhere('first_name', 'like', '%'.$this->search.'%')
+                        ->orWhere('last_name', 'like', '%'.$this->search.'%')
+                        ->orWhereHas('user', fn ($uq) => $uq->where('email', 'like', '%'.$this->search.'%'));
                 });
             })
             ->orderBy('last_name')
@@ -161,7 +175,7 @@ class Employee extends Component
 
     private function createEmployee(): void
     {
-        $user = \App\Models\User::create([
+        $user = User::create([
             'name' => "{$this->first_name} {$this->last_name}",
             'email' => $this->email,
             'password' => bcrypt($this->password),
@@ -236,7 +250,9 @@ class Employee extends Component
 
     public function delete(): void
     {
-        if (!$this->deletingId) return;
+        if (! $this->deletingId) {
+            return;
+        }
 
         $employee = EmployeeModel::findOrFail($this->deletingId);
 
@@ -249,6 +265,7 @@ class Employee extends Component
             );
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
+
             return;
         }
 
@@ -258,6 +275,7 @@ class Employee extends Component
             Flux::toast(variant: 'success', text: 'Empleado desactivado correctamente.');
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
+
             return;
         }
 

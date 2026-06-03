@@ -207,42 +207,38 @@ new class extends Component {
     {
         $validated = $this->validate();
 
-        $newStart = Carbon::parse($validated['start_date']);
-        $newEnd = !empty($validated['end_date']) ? Carbon::parse($validated['end_date']) : null;
-
-        $conflictingContract = Contract::query()
+        $activeContract = Contract::query()
             ->where('employee_id', $validated['employee_id'])
             ->where('is_active', true)
             ->when($this->editingId, function ($query) {
                 $query->where('id', '!=', $this->editingId);
             })
-            ->where(function ($query) use ($newStart) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $newStart->toDateString());
-            })
-            ->when($newEnd, function ($query) use ($newEnd) {
-                $query->where('start_date', '<=', $newEnd->toDateString());
-            })
             ->first();
 
-        if ($conflictingContract) {
-            $conflictStart = Carbon::parse($conflictingContract->start_date)->format('d/m/Y');
-            if ($conflictingContract->end_date) {
-                $conflictEnd = Carbon::parse($conflictingContract->end_date)->format('d/m/Y');
-                $message = __('El empleado ya tiene un contrato activo del :start al :end (:type).', [
-                    'start' => $conflictStart,
-                    'end' => $conflictEnd,
-                    'type' => $conflictingContract->contract_type,
-                ]);
-            } else {
-                $message = __('El empleado ya tiene un contrato activo desde :start (:type).', [
-                    'start' => $conflictStart,
-                    'type' => $conflictingContract->contract_type,
-                ]);
-            }
-
-            Flux::toast(variant: 'warning', text: $message);
+        if ($activeContract) {
+            Flux::toast(variant: 'warning', text: __('El empleado ya tiene un contrato activo.'));
             return;
+        }
+
+        if (!$this->editingId && $validated['contract_type'] === 'Temporal') {
+            $lastTemporal = Contract::query()
+                ->where('employee_id', $validated['employee_id'])
+                ->where('contract_type', 'Temporal')
+                ->whereNotNull('end_date')
+                ->orderByDesc('end_date')
+                ->first();
+
+            if ($lastTemporal) {
+                $earliestStart = $lastTemporal->end_date->copy()->addMonths(2);
+                $newStart = Carbon::parse($validated['start_date']);
+
+                if ($newStart->lt($earliestStart)) {
+                    Flux::toast(variant: 'warning', text: __('No se puede crear un contrato temporal hasta :date.', [
+                        'date' => $earliestStart->format('d/m/Y'),
+                    ]));
+                    return;
+                }
+            }
         }
 
         $payload = [

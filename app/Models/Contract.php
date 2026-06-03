@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Contract extends Model
 {
@@ -40,5 +39,18 @@ class Contract extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function isEffectivelyActive(): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if ($this->contract_type === 'Temporal' && $this->end_date) {
+            return ! $this->end_date->isPast();
+        }
+
+        return true;
     }
 }
