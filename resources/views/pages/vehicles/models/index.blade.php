@@ -108,6 +108,15 @@ new class extends Component {
         if (!$this->deletingId) return;
 
         $model = BrandModel::findOrFail($this->deletingId);
+
+        $vehiclesCount = $model->vehicles()->count();
+        if ($vehiclesCount > 0) {
+            Flux::toast(variant: 'warning', text: __('No se puede eliminar el modelo porque tiene :count vehículo(s) asignados.', ['count' => $vehiclesCount]));
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
+
         $model->delete();
         Flux::toast(variant: 'success', text: __('Modelo eliminado.'));
 

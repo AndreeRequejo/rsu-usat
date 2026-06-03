@@ -111,6 +111,15 @@ new class extends Component {
         if (!$this->deletingId) return;
 
         $vehicleColor = VehicleColor::findOrFail($this->deletingId);
+
+        $vehiclesCount = $vehicleColor->vehicles()->count();
+        if ($vehiclesCount > 0) {
+            Flux::toast(variant: 'warning', text: __('No se puede eliminar el color porque tiene :count vehículo(s) asignados.', ['count' => $vehiclesCount]));
+            $this->deletingId = null;
+            Flux::modal('confirm-delete')->close();
+            return;
+        }
+
         $vehicleColor->delete();
         Flux::toast(variant: 'success', text: __('Color eliminado.'));
 

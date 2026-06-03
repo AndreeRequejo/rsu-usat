@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VehicleColor extends Model
 {
@@ -13,4 +14,9 @@ class VehicleColor extends Model
         'code',
         'description',
     ];
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class, 'color_id');
+    }
 }
