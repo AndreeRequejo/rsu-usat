@@ -122,6 +122,55 @@
 
             </div>
         </div>
+
+        <div class="bg-white rounded-xl shadow border border-green-100 border-t-4 border-t-green-700 p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold">
+                    Programación
+                </h2>
+                <span class="text-xs font-semibold uppercase tracking-wide text-green-700 bg-green-100 px-2 py-1 rounded-full">Vehículos</span>
+            </div>
+
+            <p class="text-gray-600 mt-2">
+                Administre turnos, zonas, feriados, grupos de personal y programación.
+            </p>
+
+                 <div class="grid gap-4 mt-4 sm:grid-cols-2 xl:grid-cols-4">
+                <a href="{{ route('scheduling.shifts.index') }}"
+                     class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-palette fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Turnos</span>
+                    <span class="text-sm text-gray-500">Gestione los turnos de trabajo.</span>
+                </a>
+
+                <a href="{{ route('scheduling.zones.index') }}"
+                         class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-tags fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Zonas</span>
+                    <span class="text-sm text-gray-500">Organice las zonas de trabajo.</span>
+                </a>
+
+                <a href="{{ route('scheduling.holidays.index') }}"
+                         class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-car-side fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Feriados</span>
+                    <span class="text-sm text-gray-500">Controle los feriados.</span>
+                </a>
+
+                <a href="{{ route('scheduling.groups.index') }}"
+                         class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-truck fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Grupos de personal</span>
+                    <span class="text-sm text-gray-500">Organice los grupos de personal.</span>
+                </a>
+                <a href="{{ route('scheduling.scheduling.index') }}"
+                     class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-truck fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Programación</span>
+                    <span class="text-sm text-gray-500">Gestione la programación de rutas.</span>
+                </a>
+            </div>
+        </div>
     </div>
 
 </x-layouts::app>

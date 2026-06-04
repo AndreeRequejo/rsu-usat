@@ -16,11 +16,6 @@ class Shift extends Model
         'hour_out',
     ];
 
-    protected $casts = [
-        'hour_in' => 'datetime:H:i',
-        'hour_out' => 'datetime:H:i',
-    ];
-
     public function schedulings(): HasMany
     {
         return $this->hasMany(Scheduling::class);

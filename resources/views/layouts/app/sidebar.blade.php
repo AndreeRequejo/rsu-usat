@@ -116,6 +116,55 @@
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
+            <flux:sidebar.nav>
+                <flux:sidebar.group expandable :heading="__('Programación')" icon="user-group" class="grid">
+                    <flux:sidebar.item
+                        icon="queue-list"
+                        :href="route('scheduling.shifts.index')"
+                        :current="request()->routeIs('scheduling.shifts.*')"
+                        wire:navigate
+                    >
+                        {{ __('Turnos') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="user"
+                        :href="route('scheduling.zones.index')"
+                        :current="request()->routeIs('scheduling.zones.*')"
+                        wire:navigate
+                    >
+                        {{ __('Zonas') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('scheduling.holidays.index')"
+                        :current="request()->routeIs('scheduling.holidays.*')"
+                        wire:navigate
+                    >
+                        {{ __('Feriados') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="check-badge"
+                        :href="route('scheduling.groups.index')"
+                        :current="request()->routeIs('scheduling.groups.*')"
+                        wire:navigate
+                    >
+                        {{ __('Grupos de personal') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="arrow-left-end-on-rectangle"
+                        :href="route('scheduling.scheduling.index')"
+                        :current="request()->routeIs('scheduling.scheduling.*')"
+                        wire:navigate
+                    >
+                        {{ __('Programación') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            </flux:sidebar.nav>
+
             <flux:spacer />
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
