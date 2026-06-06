@@ -364,7 +364,7 @@ new class extends Component {
 
     <div class="bg-white rounded-xl shadow-sm border border-[#A5D6A7] p-5 mb-6">
         <div class="flex flex-wrap items-end gap-3">
-            <div class="flex-1 min-w-[220px]">
+            <div class="flex-1 min-w-55">
                 <label class="block text-sm font-medium text-[#333333] mb-2">
                     {{ __('Buscar') }}
                 </label>
@@ -381,7 +381,7 @@ new class extends Component {
                 </div>
             </div>
 
-            <div class="min-w-[200px]">
+            <div class="min-w-50">
                 <label class="block text-sm font-medium text-[#333333] mb-2">
                     {{ __('Tipo de contrato') }}
                 </label>
@@ -396,7 +396,7 @@ new class extends Component {
                 </select>
             </div>
 
-            <div class="min-w-[180px]">
+            <div class="min-w-45">
                 <label class="block text-sm font-medium text-[#333333] mb-2">
                     {{ __('Estado') }}
                 </label>
@@ -410,7 +410,7 @@ new class extends Component {
                 </select>
             </div>
 
-            <div class="min-w-[140px]">
+            <div class="min-w-35">
                 <button
                     type="button"
                     wire:click="applyFilters"
