@@ -357,7 +357,7 @@ new class extends Component {
                 {{ __('Administracion de contratos registrados del personal.') }}
             </p>
         </div>
-        <flux:button wire:click="openCreate" variant="primary" icon="plus-circle" class="bg-[#2E8B57] text-white">
+        <flux:button wire:click="openCreate" variant="primary" icon="plus-circle" class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!">
             {{ __('Nuevo Contrato') }}
         </flux:button>
     </div>

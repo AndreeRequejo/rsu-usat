@@ -228,7 +228,7 @@ new class extends Component {
                             <td class="px-6 py-4">
                                 <div class="flex justify-end gap-2">
                                     <button wire:click="openEdit({{ $color->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#F4C542] text-[#333333] hover:bg-[#D8AC34]"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#F4C542] hover:bg-[#F4C542]/20 transition"
                                             title="{{ __('Editar') }}"
                                             aria-label="{{ __('Editar') }}">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,11 +237,11 @@ new class extends Component {
                                         </svg>
                                     </button>
                                     <button wire:click="confirmDelete({{ $color->id }})"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#E53935] hover:bg-[#E53935]/20 transition"
                                             title="{{ __('Eliminar') }}"
                                             aria-label="{{ __('Eliminar') }}">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
                                     </button>
                                 </div>

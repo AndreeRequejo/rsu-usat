@@ -300,33 +300,27 @@ new class extends Component {
             wire:click="openCreate"
             variant="primary"
             icon="plus-circle"
-            class="bg-[#333333]! text-white cursor-pointer hover:bg-gray-800!"
+            class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!"
         >
             {{ __('Nueva Solicitud') }}
         </flux:button>
     </div>
 
     {{-- Search card --}}
-    <div class="bg-white rounded-xl shadow-sm border border-[#A5D6A7] p-5 mb-6 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-[#333333]">
-                {{ __('Mostrar') }}
+    <div class="bg-white rounded-xl shadow-sm border border-[#A5D6A7] p-5 mb-6">
+        <div class="w-full">
+            <label class="block text-sm font-medium text-[#333333] mb-2">
+                {{ __('Buscar') }}
             </label>
-            <select class="border border-[#A5D6A7] rounded text-sm py-1 bg-white focus:outline-none focus:ring-1 focus:ring-[#2E8B57]">
-                <option>10</option>
-            </select>
-            <label class="text-sm font-medium text-[#333333]">
-                {{ __('registros') }}
-            </label>
-        </div>
-        <div class="flex gap-3 items-center">
-            <label class="text-sm font-medium text-[#333333]">{{ __('Buscar:') }}</label>
-            <div class="relative w-64">
+            <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#333333]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
                 <input
                     type="text"
                     wire:model.live.debounce.300ms="search"
                     placeholder="{{ __('DNI, nombre...') }}"
-                    class="w-full px-3 py-1.5 border border-[#A5D6A7] rounded bg-white text-sm focus:outline-none focus:ring-1 focus:ring-[#2E8B57]"
+                    class="w-full pl-10 pr-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]"
                 />
             </div>
         </div>
@@ -355,9 +349,9 @@ new class extends Component {
                         <tr wire:key="vac-{{ $vacation->id }}" class="{{ $i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20' }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition text-center text-gray-700">
                             <td class="px-4 py-3 font-medium">{{ $vacation->employee->dni }}</td>
                             <td class="px-4 py-3 text-left font-medium">{{ $vacation->employee->first_name }} {{ $vacation->employee->last_name }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ $vacation->request_date ? clone($vacation->request_date)->format('d/m/Y') : '' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ $vacation->start_date ? clone($vacation->start_date)->format('d/m/Y') : '' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ $vacation->end_date ? clone($vacation->end_date)->format('d/m/Y') : '' }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ $vacation->request_date?->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ $vacation->start_date?->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ $vacation->end_date?->format('d/m/Y') }}</td>
                             <td class="px-4 py-3 font-semibold text-[#007bff]">{{ $vacation->requested_days }}</td>
                             <td class="px-4 py-3">
                                 @if($vacation->status === 'Aprobada')
@@ -371,7 +365,7 @@ new class extends Component {
                                 @endif
                             </td>
                             <td class="px-4 py-3 font-semibold text-gray-700 border-l border-r border-[#A5D6A7]/50">{{ $this->getAvailableDays($vacation->employee) }}</td>
-                            <td class="px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate" title="{{ $vacation->notes }}">{{ $vacation->notes ?: '-' }}</td>
+                            <td class="px-4 py-3 text-xs text-gray-500 max-w-30 truncate" title="{{ $vacation->notes }}">{{ $vacation->notes ?: '-' }}</td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-center gap-1">
                                     @if($vacation->status === 'Pendiente')
@@ -408,24 +402,16 @@ new class extends Component {
     </div>
 
     {{-- Modal crear/editar --}}
-    <flux:modal name="vacation-form" wire:close="closeModal" class="md:w-[600px] !p-0">
-        <form wire:submit="save">
-            <!-- Header Modal -->
-            <div class="bg-[#0b5394] text-white px-4 py-3 rounded-t-xl flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
-                    <h2 class="font-semibold text-lg">
-                        {{ $editingId ? __('Editar Solicitud de Vacaciones') : __('Nueva Solicitud de Vacaciones') }}
-                    </h2>
+    <flux:modal name="vacation-form" wire:close="closeModal" class="md:w-[720px] max-h-[90vh] overflow-y-auto">
+        <form wire:submit="save" class="space-y-5" novalidate>
+            <div class="flex items-center justify-between px-6 pt-4 pb-2">
+                <div>
+                    <flux:heading size="lg">{{ $editingId ? 'Editar Solicitud de Vacaciones' : 'Nueva Solicitud de Vacaciones' }}</flux:heading>
+                    <flux:text class="mt-1 text-sm text-[#666666]">Complete los campos obligatorios.</flux:text>
                 </div>
-                <button type="button" wire:click="closeModal" class="text-white hover:text-gray-300">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
             </div>
 
-            <!-- Body Modal -->
-            <div class="p-6 space-y-5 bg-white">
-                
+            <div class="px-6 space-y-4">
                 <div class="relative">
                     <label class="block text-sm font-medium text-[#333333] mb-2">Personal *</label>
                     <input
@@ -459,16 +445,25 @@ new class extends Component {
                     @error('employee_id') <span class="text-xs text-[#E53935] mt-1 block">{{ $message }}</span> @enderror
                 </div>
 
-                <flux:input wire:model.live="requested_days" type="number" min="1" :label="__('Días Solicitados *')" placeholder="{{ __('Número de días') }}" />
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <flux:input wire:model.live="requested_days" type="number" min="1" label="Días Solicitados *" placeholder="Número de días" />
+                    </div>
+                    <div class="flex-1">
+                        <flux:input wire:model.live="start_date" type="date" label="Fecha de Inicio *" />
+                    </div>
+                </div>
 
-                <flux:input wire:model.live="start_date" type="date" :label="__('Fecha de Inicio *')" />
-                
-                <flux:input wire:model="end_date" type="date" :label="__('Fecha de Fin *')" placeholder="dd/mm/aaaa" readonly class="bg-gray-100" />
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <flux:input wire:model="end_date" type="date" label="Fecha de Fin *" readonly class="bg-gray-100" />
+                    </div>
+                    <div class="flex-1">
+                        <flux:textarea wire:model="notes" label="Notas" placeholder="Observaciones o comentarios sobre la solicitud..." rows="3" />
+                    </div>
+                </div>
 
-                <flux:textarea wire:model="notes" :label="__('Notas')" placeholder="{{ __('Observaciones o comentarios sobre la solicitud...') }}" rows="3" />
-
-                <!-- Leyenda Importante -->
-                <div class="bg-[#fff3cd] border-l-4 border-[#ffc107] text-[#856404] p-3 text-xs rounded shadow-sm shadow-[#ffc107]/20 mt-2">
+                <div class="bg-[#fff3cd] border-l-4 border-[#ffc107] text-[#856404] p-3 text-xs rounded shadow-sm shadow-[#ffc107]/20">
                     <p class="font-bold flex items-center mb-1">
                         <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                         Importante:
@@ -481,22 +476,17 @@ new class extends Component {
                 </div>
             </div>
 
-            <!-- Footer Modal -->
-            <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl bg-gray-50">
-                <button type="button" wire:click="closeModal" class="bg-[#dc3545] text-white px-4 py-2 rounded text-sm font-medium hover:bg-[#c82333] transition flex items-center gap-1">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    Cancelar
-                </button>
-                <button type="submit" class="bg-[#007bff] text-white px-4 py-2 rounded text-sm font-medium hover:bg-[#0069d9] transition flex items-center gap-1">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                    Guardar
-                </button>
+            <div class="px-6 py-4 bg-[#F5F5F5] border-t border-[#E0E0E0] flex justify-end gap-3">
+                <flux:button type="button" variant="ghost" wire:click="closeModal" class="text-[#333333]">Cancelar</flux:button>
+                <flux:button type="submit" variant="primary" class="bg-[#2E8B57] text-white hover:bg-[#257046]">
+                    {{ $editingId ? 'Actualizar' : 'Guardar' }}
+                </flux:button>
             </div>
         </form>
     </flux:modal>
 
     {{-- Modal confirmar eliminación --}}
-    <flux:modal name="confirm-delete" class="md:w-[400px]">
+    <flux:modal name="confirm-delete" class="md:w-100">
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg" class="text-red-600">
