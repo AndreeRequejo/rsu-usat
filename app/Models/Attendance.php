@@ -7,21 +7,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Attendance extends Model
 {
-    protected $table = 'attendances';
-
     protected $fillable = [
         'employee_id',
+        'shift_id',
         'attendance_date',
+        'attendance_time',
+        'type',
         'status',
         'notes',
     ];
 
-    protected $casts = [
-        'attendance_date' => 'date',
-    ];
-
-    public function employee(): BelongsTo
+    public function employee()
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
     }
 }
