@@ -12,8 +12,15 @@ class District extends Model
 
     protected $fillable = [
         'name',
+        'code',
+        'department_id',
         'province_id',
     ];
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
 
     public function province(): BelongsTo
     {
@@ -23,5 +30,10 @@ class District extends Model
     public function sectors(): HasMany
     {
         return $this->hasMany(Sector::class);
+    }
+
+    public function zones(): HasMany
+    {
+        return $this->hasMany(Zone::class);
     }
 }

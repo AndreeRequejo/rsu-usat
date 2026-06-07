@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Pages\Personnel\Employee;
+use App\Livewire\Pages\Scheduling\Zones\Zone;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -19,7 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('personal/contratos', 'personnel.contracts.index')->name('personnel.contracts.index');
     Route::livewire('personal/vacaciones', 'personnel.vacations.index')->name('personnel.vacations.index');
     Route::livewire('programacion/turnos', 'scheduling.shifts.index')->name('scheduling.shifts.index');
-    Route::livewire('programacion/zonas', 'scheduling.zones.index')->name('scheduling.zones.index');
+    Route::livewire('programacion/zonas', Zone::class)->name('scheduling.zones.index');
     Route::livewire('programacion/feriados', 'scheduling.holidays.index')->name('scheduling.holidays.index');
     Route::livewire('programacion/grupos', 'scheduling.groups.index')->name('scheduling.groups.index');
     Route::livewire('programacion/programacion', 'scheduling.scheduling.index')->name('scheduling.scheduling.index');

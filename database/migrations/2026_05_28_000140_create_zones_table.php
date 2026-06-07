@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('name', 150);
             $table->decimal('area', 10, 2)->nullable();
             $table->text('description')->nullable();
+            $table->decimal('average_waste', 10, 2)->nullable();
+            $table->string('status', 50)->default('active');
             $table->foreignId('sector_id')
                 ->constrained('sectors')
                 ->cascadeOnUpdate()

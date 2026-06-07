@@ -11,11 +11,16 @@ class Department extends Model
 
     protected $fillable = [
         'name',
-        'description',
+        'code',
     ];
 
-    public function contracts(): HasMany
+    public function provinces(): HasMany
     {
-        return $this->hasMany(Contract::class);
+        return $this->hasMany(Province::class);
+    }
+
+    public function districts(): HasMany
+    {
+        return $this->hasMany(District::class);
     }
 }

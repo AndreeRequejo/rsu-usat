@@ -26,12 +26,12 @@ return new class extends Migration
 
             $table->enum('type', [
                 'Ingreso',
-                'Salida'
+                'Salida',
             ]);
 
             $table->enum('status', [
                 'Presente',
-                'Ausente'
+                'Ausente',
             ]);
 
             $table->text('notes')->nullable();
