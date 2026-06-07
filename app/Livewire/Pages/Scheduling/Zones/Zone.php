@@ -211,9 +211,7 @@ class Zone extends Component
             'longitude' => (float) $c->longitude,
         ])->toArray();
         $this->coords_json = json_encode($this->coords);
-        $this->activeTab = 'data';
-        $this->dispatch('zone-edit-opened', zoneId: $id);
-        Flux::modal('zone-form')->show();
+        Flux::modal('zone-edit')->show();
     }
 
     #[On('open-viewer')]
@@ -227,6 +225,12 @@ class Zone extends Component
     {
         $this->resetForm();
         Flux::modal('zone-form')->close();
+    }
+
+    public function closeEditModal(): void
+    {
+        $this->resetForm();
+        Flux::modal('zone-edit')->close();
     }
 
     public function closeViewer(): void
@@ -285,6 +289,12 @@ class Zone extends Component
         }
 
         $this->closeFormModal();
+    }
+
+    public function saveEdit(string $coordsJson = ''): void
+    {
+        $this->save($coordsJson);
+        Flux::modal('zone-edit')->close();
     }
 
     public function saveAndFinish(): void

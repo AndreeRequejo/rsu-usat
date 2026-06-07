@@ -60,6 +60,7 @@
     </div>
 
     @include('pages.scheduling.zones.components.form')
+    @include('pages.scheduling.zones.components.edit')
     @include('pages.scheduling.zones.components.delete')
     @include('pages.scheduling.zones.components.viewer-modal')
 </div>

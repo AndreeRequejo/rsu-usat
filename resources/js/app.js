@@ -316,6 +316,7 @@ function zoneMapPickerFactory(config) {
             var storage = document.getElementById(storageKey);
             if (storage) {
                 storage.value = JSON.stringify(this.coords);
+                storage.dispatchEvent(new CustomEvent('coords-synced', { bubbles: true }));
             }
         },
     };

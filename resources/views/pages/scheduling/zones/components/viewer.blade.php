@@ -33,7 +33,7 @@
 
     <div class="flex-1 overflow-y-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-0">
         <aside class="bg-[#F5F5F5] p-5 space-y-3 overflow-y-auto">
-            <div class="bg-gradient-to-br from-[#5E35B1] to-[#4527A0] rounded-lg p-4 text-white">
+            <div class="bg-linear-to-br from-[#5E35B1] to-[#4527A0] rounded-lg p-4 text-white">
                 <div class="flex items-center gap-2 mb-1">
                     <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
