@@ -48,6 +48,74 @@ new class extends Component {
             'hour_out.date_format' => __('La hora de finalización no es válida.'),
         ];
     }
+
+    private function hasOverlap(string $hourIn, string $hourOut): bool
+    {
+        $newIntervals = $this->buildIntervals($hourIn, $hourOut);
+
+        $shifts = Shift::query()
+            ->when(
+                $this->editingId,
+                fn ($query) => $query->where('id', '!=', $this->editingId)
+            )
+            ->get();
+
+        foreach ($shifts as $shift) {
+            $existingIntervals = $this->buildIntervals(
+                $shift->hour_in,
+                $shift->hour_out
+            );
+
+            foreach ($newIntervals as $new) {
+                foreach ($existingIntervals as $existing) {
+
+                    // [inicio, fin)
+                    if (
+                        $new['start'] < $existing['end'] &&
+                        $new['end'] > $existing['start']
+                    ) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function buildIntervals(string $start, string $end): array
+    {
+        $startMinutes = $this->toMinutes($start);
+        $endMinutes = $this->toMinutes($end);
+
+        // mismo día
+        if ($startMinutes < $endMinutes) {
+            return [[
+                'start' => $startMinutes,
+                'end' => $endMinutes,
+            ]];
+        }
+
+        // cruza medianoche
+        return [
+            [
+                'start' => $startMinutes,
+                'end' => 1440,
+            ],
+            [
+                'start' => 0,
+                'end' => $endMinutes,
+            ]
+        ];
+    }
+
+    private function toMinutes(string $time): int
+    {
+        [$hour, $minute] = explode(':', substr($time, 0, 5));
+
+        return ((int) $hour * 60) + (int) $minute;
+    }
+
     public function save(): void
     {
         $validated = $this->validate();
@@ -61,6 +129,18 @@ new class extends Component {
                 return;
             }
 
+        if ($this->hasOverlap(
+            $validated['hour_in'],
+            $validated['hour_out']
+        )) {
+            $this->addError(
+                'hour_in',
+                __('El turno se solapa con otro turno existente.')
+            );
+
+            return;
+        }
+        
         if ($this->editingId) {
             $shift = Shift::findOrFail($this->editingId);
             $shift->update($validated);
