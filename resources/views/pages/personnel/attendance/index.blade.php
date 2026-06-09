@@ -23,8 +23,8 @@ new class extends Component {
     public string $attendance_date = '';
     public string $attendance_time = '';
     public ?int $shift_id = null;
-    public string $type = '';
-    public bool $typeManuallyModified = false;
+    public ?string $detectedShiftName = null;
+    public ?string $detectedType = null;
 
     public string $status = 'Presente';
     public string $notes = '';
@@ -37,8 +37,6 @@ new class extends Component {
             'attendance_time' => ['required'],
             'status' => ['required', Rule::in(['Presente', 'Ausente'])],
             'notes' => ['nullable', 'string'],
-            'shift_id' => ['required', 'exists:shifts,id'],
-            'type' => ['required', Rule::in(['Ingreso', 'Salida'])],
         ];
     }
 
@@ -54,16 +52,23 @@ new class extends Component {
             'attendance_time.required' => __('La hora es obligatoria.'),
 
             'status.required' => __('Debe seleccionar un estado.'),
-            'type.required' => __('Debe seleccionar un tipo.'),
         ];
     }
 
     #[Computed]
     public function employees()
     {
-        return Employee::query()->where('active', true)->orderBy('last_name')->orderBy('first_name')->get();
+        return Employee::query()
+            ->where('active', true)
+            ->whereHas('contracts', function ($query) {
+                $query->where('is_active', true)->where(function ($q) {
+                    $q->whereNull('end_date')->orWhereDate('end_date', '>=', now()->toDateString());
+                });
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get();
     }
-
     #[Computed]
     public function shifts()
     {
@@ -91,93 +96,96 @@ new class extends Component {
     {
         $this->resetPage();
     }
-    private function detectShiftByHour(): ?int
-    {
-        if (!$this->attendance_time) {
-            return null;
-        }
 
-        $current = $this->timeToMinutes($this->attendance_time);
-
-        foreach (Shift::all() as $shift) {
-            $start = $this->timeToMinutes($shift->hour_in);
-            $end = $this->timeToMinutes($shift->hour_out);
-
-            if ($start <= $end) {
-                if ($current >= $start && $current <= $end) {
-                    return $shift->id;
-                }
-            } else {
-                // turno nocturno (ej: 22:00 - 06:00)
-
-                if ($current >= $start || $current <= $end) {
-                    return $shift->id;
-                }
-            }
-        }
-
+private function detectShiftByHour(): ?int
+{
+    if (!$this->attendance_time) {
         return null;
     }
 
-    public function updatedAttendanceTime(): void
-    {
-        $this->shift_id = $this->detectShiftByHour();
+    $currentMinutes = $this->timeToMinutes($this->attendance_time);
 
-        if (!$this->typeManuallyModified) {
-            $this->calculateType();
-        }
-    }
+    $tolerance = 10; // minutos
 
-    public function updatedShiftId(): void
-    {
-        if (!$this->typeManuallyModified) {
-            $this->calculateType();
-        }
-    }
-
-    public function updatedType(): void
-    {
-        $this->typeManuallyModified = true;
-    }
-
-    private function calculateType(): void
-    {
-        if (!$this->shift_id || !$this->attendance_time) {
-            $this->type = '';
-            return;
-        }
-
-        $shift = Shift::find($this->shift_id);
-
-        if (!$shift) {
-            $this->type = '';
-            return;
-        }
-
-        $attendanceMinutes = $this->timeToMinutes($this->attendance_time);
+    foreach (Shift::all() as $shift) {
 
         $startMinutes = $this->timeToMinutes($shift->hour_in);
-        $endMinutes = $this->timeToMinutes($shift->hour_out);
+        $endMinutes   = $this->timeToMinutes($shift->hour_out);
 
-        $distanceToStart = abs($attendanceMinutes - $startMinutes);
-        $distanceToEnd = abs($attendanceMinutes - $endMinutes);
+        // ampliar ventana
+        $startMinutes -= $tolerance;
+        $endMinutes   += $tolerance;
 
-        $this->type = $distanceToStart <= $distanceToEnd ? 'Ingreso' : 'Salida';
+        // turno normal
+        if ($startMinutes <= $endMinutes) {
+
+            if (
+                $currentMinutes >= $startMinutes &&
+                $currentMinutes <= $endMinutes
+            ) {
+                return $shift->id;
+            }
+        }
+
+        // turno nocturno
+        else {
+
+            if (
+                $currentMinutes >= $startMinutes ||
+                $currentMinutes <= $endMinutes
+            ) {
+                return $shift->id;
+            }
+        }
     }
+
+    return null;
+}
+
+private function determineAttendanceType(int $shiftId): string
+{
+    $count = Attendance::query()
+        ->where('employee_id', $this->employee_id)
+        ->whereDate('attendance_date', $this->attendance_date)
+        ->where('shift_id', $shiftId)
+        ->count();
+
+    return $count === 0 ? 'Ingreso' : 'Salida';
+}
+
+    public function updateAttendanceInfo(): void
+    {
+        $shiftId = $this->detectShiftByHour();
+
+        if (!$shiftId) {
+            $this->detectedShiftName = null;
+            $this->detectedType = null;
+            return;
+        }
+
+        $shift = Shift::find($shiftId);
+
+        $this->detectedShiftName = $shift?->name;
+
+        if ($this->employee_id && $this->attendance_date) {
+            $this->detectedType = $this->determineAttendanceType($shiftId);
+        }
+    }
+
     private function timeToMinutes(string $time): int
     {
         [$hours, $minutes] = explode(':', substr($time, 0, 5));
 
         return (int) $hours * 60 + (int) $minutes;
     }
+
     public function openCreate(): void
     {
         $this->resetForm();
 
         $this->attendance_date = now()->timezone('America/Lima')->format('Y-m-d');
         $this->attendance_time = now()->timezone('America/Lima')->format('H:i');
-        $this->shift_id = $this->detectShiftByHour();
-        $this->calculateType();
+        $this->updateAttendanceInfo();
 
         Flux::modal('attendance-form')->show();
     }
@@ -192,50 +200,140 @@ new class extends Component {
         $this->attendance_time = substr($attendance->attendance_time, 0, 5);
         $this->status = $attendance->status;
         $this->notes = $attendance->notes ?? '';
-        $this->shift_id = $attendance->shift_id;
-        $this->type = $attendance->type;
+        $this->detectedShiftName = $attendance->shift?->name;
+        $this->detectedType = $attendance->type;
 
         Flux::modal('attendance-form')->show();
     }
 
-    public function save(): void
-    {
-        $validated = $this->validate();
+public function save(): void
+{
+    $validated = $this->validate();
 
-        $shift = Shift::find($validated['shift_id']);
+    // Detectar turno automáticamente según la hora
+    $shiftId = $this->detectShiftByHour();
 
-        if (!$shift) {
-            Flux::toast(variant: 'warning', text: __('Debe seleccionar un turno.'));
+    if (!$shiftId) {
+        Flux::toast(
+            variant: 'warning',
+            text: __('No existe un turno configurado para la hora seleccionada.')
+        );
 
-            return;
-        }
-
-        $this->calculateType();
-
-        $payload = [
-            'employee_id' => $validated['employee_id'],
-            'attendance_date' => $validated['attendance_date'],
-            'attendance_time' => $validated['attendance_time'],
-            'status' => $validated['status'],
-            'notes' => $validated['notes'] ?: null,
-            'shift_id' => $shift->id,
-            'type' => $validated['type'],
-        ];
-
-        if ($this->editingId) {
-            Attendance::findOrFail($this->editingId)->update($payload);
-
-            Flux::toast(variant: 'success', text: __('Asistencia actualizada correctamente.'));
-        } else {
-            Attendance::create($payload);
-
-            Flux::toast(variant: 'success', text: __('Asistencia registrada correctamente.'));
-        }
-
-        $this->resetForm();
-
-        Flux::modal('attendance-form')->close();
+        return;
     }
+
+    // Validar que el empleado tenga contrato activo
+    $employee = Employee::query()
+        ->where('id', $validated['employee_id'])
+        ->whereHas('contracts', function ($query) {
+            $query->where('is_active', true)
+                ->where(function ($q) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', now()->toDateString());
+                });
+        })
+        ->first();
+
+    if (!$employee) {
+        Flux::toast(
+            variant: 'warning',
+            text: __('El empleado no posee un contrato activo.')
+        );
+
+        return;
+    }
+
+    // Registros existentes del empleado en ese turno y fecha
+    $recordsInShift = Attendance::query()
+        ->where('employee_id', $validated['employee_id'])
+        ->whereDate('attendance_date', $validated['attendance_date'])
+        ->where('shift_id', $shiftId)
+        ->when($this->editingId, function ($query) {
+            $query->where('id', '!=', $this->editingId);
+        })
+        ->orderBy('attendance_time')
+        ->get();
+
+    // Máximo: 1 ingreso y 1 salida
+    if ($recordsInShift->count() >= 2) {
+        Flux::toast(
+            variant: 'warning',
+            text: __('Ya existe un ingreso y una salida registrados para este turno.')
+        );
+
+        return;
+    }
+
+    // No permitir horas repetidas
+    $existingAttendance = Attendance::query()
+        ->where('employee_id', $validated['employee_id'])
+        ->whereDate('attendance_date', $validated['attendance_date'])
+        ->where('shift_id', $shiftId)
+        ->where('attendance_time', $validated['attendance_time'])
+        ->when($this->editingId, function ($query) {
+            $query->where('id', '!=', $this->editingId);
+        })
+        ->exists();
+
+    if ($existingAttendance) {
+        Flux::toast(
+            variant: 'warning',
+            text: __('Ya existe una asistencia registrada con esa hora.')
+        );
+
+        return;
+    }
+
+    // Determinar automáticamente si es Ingreso o Salida
+    $type = $recordsInShift->count() === 0
+        ? 'Ingreso'
+        : 'Salida';
+
+    // Evitar dos ingresos o dos salidas seguidas
+    $lastAttendance = $recordsInShift->last();
+
+    if ($lastAttendance && $lastAttendance->type === $type) {
+        Flux::toast(
+            variant: 'warning',
+            text: __('No puede registrar dos ' . strtolower($type) . ' consecutivos.')
+        );
+
+        return;
+    }
+
+    $payload = [
+        'employee_id'      => $validated['employee_id'],
+        'attendance_date'  => $validated['attendance_date'],
+        'attendance_time'  => $validated['attendance_time'],
+        'shift_id'         => $shiftId,
+        'type'             => $type,
+        'status'           => $validated['status'],
+        'notes'            => $validated['notes'] ?: null,
+    ];
+
+    if ($this->editingId) {
+
+        Attendance::findOrFail($this->editingId)->update($payload);
+
+        Flux::toast(
+            variant: 'success',
+            text: __('Asistencia actualizada correctamente.')
+        );
+
+    } else {
+
+        Attendance::create($payload);
+
+        Flux::toast(
+            variant: 'success',
+            text: __('Asistencia registrada correctamente.')
+        );
+    }
+
+    $this->resetForm();
+
+    Flux::modal('attendance-form')->close();
+}
 
     public function confirmDelete(int $id): void
     {
@@ -268,7 +366,7 @@ new class extends Component {
 
     private function resetForm(): void
     {
-        $this->reset(['employee_id', 'attendance_date', 'attendance_time', 'shift_id', 'type', 'status', 'notes', 'editingId']);
+        $this->reset(['employee_id', 'attendance_date', 'attendance_time', 'status', 'notes', 'editingId']);
 
         $this->status = 'Presente';
         $this->notes = '';
@@ -527,7 +625,7 @@ new class extends Component {
 
             <div class="grid gap-4 sm:grid-cols-2">
 
-                <flux:select wire:model.live="shift_id" :label="__('Turno')">
+                {{--                 <flux:select wire:model.live="shift_id" :label="__('Turno')">
                     <option value="">
                         {{ __('Seleccionar...') }}
                     </option>
@@ -555,8 +653,42 @@ new class extends Component {
                     <option value="Salida">
                         {{ __('Salida') }}
                     </option>
-                </flux:select>
+                </flux:select> --}}
 
+                <div class="rounded-lg border border-[#A5D6A7] p-4">
+
+                    <div class="text-sm font-medium text-[#333333] mb-2">
+                        {{ __('Registro automático') }}
+                    </div>
+
+                    <div class="text-sm text-[#666666]">
+                        {{ __('El turno y el tipo de registro (Ingreso/Salida) serán detectados automáticamente al guardar la asistencia.') }}
+                    </div>
+
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+
+                    <div>
+                        <label class="block text-sm font-medium text-[#333333] mb-2">
+                            {{ __('Turno detectado') }}
+                        </label>
+
+                        <div class="w-full px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
+                            {{ $detectedShiftName ?: __('Sin turno asignado') }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-[#333333] mb-2">
+                            {{ __('Tipo de registro') }}
+                        </label>
+
+                        <div class="w-full px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
+                            {{ $detectedType ?: __('No determinado') }}
+                        </div>
+                    </div>
+
+                </div>
             </div>
 
             <flux:textarea wire:model="notes" :label="__('Observaciones')" rows="4"

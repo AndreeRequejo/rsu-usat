@@ -25,8 +25,8 @@ class ShiftSeeder extends Seeder
             [
                 'name' => 'Turno Madrugada',
                 'description' => 'Turno de madrugada.',
-                'hour_in' => '00:00:00',
-                'hour_out' => '03:00:00',
+                'hour_in' => '23:55:00',
+                'hour_out' => '02:55:00',
             ],
         ];
 
