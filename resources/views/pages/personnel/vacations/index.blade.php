@@ -84,6 +84,18 @@ new class extends Component {
     {
         $validated = $this->validate();
 
+        // --- VALIDACIÓN DE DÍAS DISPONIBLES ---
+        $employee = Employee::find($this->employee_id);
+        if ($employee) {
+            $availableDays = $this->getAvailableDays($employee);
+            
+            if ($this->requested_days > $availableDays) {
+                $this->addError('requested_days', __("Días insuficientes. El empleado solo tiene {$availableDays} días disponibles."));
+                return; 
+            }
+        }
+        // --------------------------------------
+
         $hasOverlap = Vacation::where('employee_id', $this->employee_id)
             ->whereIn('status', ['Pendiente', 'Aprobada'])
             ->where(function($q) use ($validated) {
