@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             ContractSeeder::class,
             VehicleSeeder::class,
             ShiftSeeder::class,
+            StaffGroupSeeder::class,
         ]);
     }
 }

@@ -42,4 +42,9 @@ class Scheduling extends Model
     {
         return $this->hasMany(GroupDetail::class);
     }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(SchedulingHistory::class);
+    }
 }
