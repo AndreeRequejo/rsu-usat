@@ -10,9 +10,26 @@ class Holiday extends Model
         'date',
         'name',
         'description',
+        'is_active',
     ];
 
     protected $casts = [
         'date' => 'date',
+        'is_active' => 'boolean',
     ];
+
+    public function getDayNameAttribute(): string
+    {
+        $days = [
+            'Sunday' => 'domingo',
+            'Monday' => 'lunes',
+            'Tuesday' => 'martes',
+            'Wednesday' => 'miércoles',
+            'Thursday' => 'jueves',
+            'Friday' => 'viernes',
+            'Saturday' => 'sábado',
+        ];
+
+        return $days[$this->date->format('l')] ?? $this->date->format('l');
+    }
 }

@@ -50,6 +50,7 @@ class HolidaySeeder extends Seeder
                 [
                     'name' => $holiday['name'],
                     'description' => 'Feriado nacional.',
+                    'is_active' => true,
                 ]
             );
         }

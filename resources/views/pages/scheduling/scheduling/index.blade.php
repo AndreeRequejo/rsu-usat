@@ -553,7 +553,7 @@ new class extends Component
             return collect();
         }
 
-        return Holiday::whereIn('date', $holidayDates)->orderBy('date')->get();
+        return Holiday::whereIn('date', $holidayDates)->where('is_active', true)->orderBy('date')->get();
     }
 
     private function summarizeHolidays($holidays): string
