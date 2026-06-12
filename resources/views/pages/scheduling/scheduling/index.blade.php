@@ -2,12 +2,13 @@
 
 use App\Models\Employee;
 use App\Models\GroupDetail;
+use App\Models\Holiday;
 use App\Models\Scheduling;
 use App\Models\SchedulingHistory;
 use App\Models\Shift;
 use App\Models\StaffGroup;
-use App\Models\Vehicle;
 use App\Models\Vacation;
+use App\Models\Vehicle;
 use App\Models\Zone;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -16,36 +17,60 @@ use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 
-new class extends Component {
+new class extends Component
+{
     use WithPagination;
 
     public string $search = '';
+
     public string $filterStart = '';
+
     public string $filterEnd = '';
+
     public string $zoneFilter = '';
+
     public string $shiftFilter = '';
 
     public ?int $editingId = null;
+
     public ?int $deletingId = null;
+
     public ?int $historyId = null;
 
     public string $modalTitle = 'Nueva Programacion';
+
     public string $start_date = '';
+
     public string $end_date = '';
+
     public ?int $staff_group_id = null;
+
     public ?int $zone_id = null;
+
     public ?int $shift_id = null;
+
     public ?int $vehicle_id = null;
+
     public ?int $driver_id = null;
+
     public ?int $helper_one_id = null;
+
     public ?int $helper_two_id = null;
+
     public array $work_days = [];
+
     public string $notes = '';
 
     public bool $availabilityChecked = false;
+
     public bool $availabilityValid = false;
+
     public bool $formChangedAfterValidation = false;
+
     public array $availabilityErrors = [];
+
+    public array $availabilityWarnings = [];
+
     public array $availabilitySuggestions = [];
 
     public function mount(): void
@@ -136,22 +161,9 @@ new class extends Component {
 
     public function updatedStaffGroupId($value): void
     {
-        if (! $value) {
+        if (! $this->syncStaffGroupValues($value)) {
             return;
         }
-
-        $group = StaffGroup::with(['zone', 'shift', 'vehicle', 'driver', 'helperOne', 'helperTwo'])->find($value);
-        if (! $group) {
-            return;
-        }
-
-        $this->zone_id = $group->zone_id;
-        $this->shift_id = $group->shift_id;
-        $this->vehicle_id = $group->vehicle_id;
-        $this->driver_id = $group->driver_id;
-        $this->helper_one_id = $group->helper_one_id;
-        $this->helper_two_id = $group->helper_two_id;
-        $this->work_days = $group->work_days ?? [];
 
         if ($this->editingId) {
             $this->syncSingleDayWorkDay();
@@ -179,6 +191,7 @@ new class extends Component {
         $scheduling = Scheduling::with('groupDetails.employee')->findOrFail($id);
         if ($scheduling->status === 'Finalizado') {
             Flux::toast(variant: 'warning', text: 'No se puede modificar una programacion finalizada.');
+
             return;
         }
 
@@ -209,8 +222,10 @@ new class extends Component {
 
     public function validateAvailability(): void
     {
+        $this->syncStaffGroupValues($this->staff_group_id);
         $this->validate();
         $this->availabilityErrors = [];
+        $this->availabilityWarnings = [];
         $this->availabilitySuggestions = [];
 
         $dates = $this->selectedDates();
@@ -218,9 +233,17 @@ new class extends Component {
             $this->availabilityErrors[] = 'No hay fechas dentro del rango que coincidan con los dias de trabajo seleccionados.';
         }
 
+        $schedulableDates = $this->schedulableDates($dates);
+
         $this->validateDifferentPeople();
-        $this->validateContractsAndVacations($dates);
-        $this->validateSchedulingConflicts($dates);
+        $this->validateHolidays($dates, $schedulableDates);
+
+        if ($dates->isNotEmpty() && $schedulableDates->isEmpty()) {
+            $this->availabilityErrors[] = 'No hay fechas laborables para registrar despues de excluir los feriados.';
+        }
+
+        $this->validateContractsAndVacations($schedulableDates);
+        $this->validateSchedulingConflicts($schedulableDates);
 
         $this->availabilityChecked = true;
         $this->availabilityValid = empty($this->availabilityErrors);
@@ -229,16 +252,29 @@ new class extends Component {
 
     public function save(): void
     {
+        $this->syncStaffGroupValues($this->staff_group_id);
         $this->validate();
 
         if (! $this->availabilityChecked || ! $this->availabilityValid || $this->formChangedAfterValidation) {
             Flux::toast(variant: 'warning', text: 'Primero valide la disponibilidad.');
+
             return;
         }
 
         $dates = $this->selectedDates();
         if ($dates->isEmpty()) {
             $this->addError('work_days', 'No hay fechas para generar.');
+
+            return;
+        }
+
+        $schedulableDates = $this->schedulableDates($dates);
+        if ($schedulableDates->isEmpty()) {
+            $this->availabilityErrors = ['No hay fechas laborables para registrar despues de excluir los feriados.'];
+            $this->availabilityChecked = true;
+            $this->availabilityValid = false;
+            Flux::toast(variant: 'warning', text: 'No hay fechas laborables para registrar.');
+
             return;
         }
 
@@ -246,7 +282,7 @@ new class extends Component {
             $scheduling = Scheduling::findOrFail($this->editingId);
             $before = $scheduling->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes']);
             $scheduling->update([
-                'date' => $dates->first()->format('Y-m-d'),
+                'date' => $schedulableDates->first()->format('Y-m-d'),
                 'shift_id' => $this->shift_id,
                 'vehicle_id' => $this->vehicle_id,
                 'zone_id' => $this->zone_id,
@@ -256,7 +292,7 @@ new class extends Component {
             $this->writeHistory($scheduling->id, 'Actualizacion', 'Se modifico la programacion.', ['before' => $before, 'after' => $scheduling->fresh()->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes'])]);
             Flux::toast(variant: 'success', text: 'Programacion actualizada.');
         } else {
-            foreach ($dates as $date) {
+            foreach ($schedulableDates as $date) {
                 $scheduling = Scheduling::create([
                     'date' => $date->format('Y-m-d'),
                     'shift_id' => $this->shift_id,
@@ -300,6 +336,7 @@ new class extends Component {
             Flux::toast(variant: 'warning', text: 'No se puede eliminar una programacion finalizada.');
             $this->deletingId = null;
             Flux::modal('confirm-delete')->close();
+
             return;
         }
 
@@ -405,7 +442,19 @@ new class extends Component {
         }
 
         return collect(CarbonPeriod::create($this->start_date, $this->end_date))
-            ->filter(fn (Carbon $date) => in_array($date->dayOfWeekIso, array_map('intval', $this->work_days), true))
+            ->filter(fn ($date) => in_array($date->dayOfWeekIso, array_map('intval', $this->work_days), true))
+            ->values();
+    }
+
+    private function schedulableDates($dates)
+    {
+        $holidayDates = $this->holidaysForDates($dates)
+            ->pluck('date')
+            ->map(fn ($date) => $date->format('Y-m-d'))
+            ->all();
+
+        return $dates
+            ->reject(fn ($date) => in_array($date->format('Y-m-d'), $holidayDates, true))
             ->values();
     }
 
@@ -440,12 +489,78 @@ new class extends Component {
             ->value('id');
     }
 
+    private function syncStaffGroupValues($staffGroupId): bool
+    {
+        if (! $staffGroupId) {
+            return false;
+        }
+
+        $group = StaffGroup::find($staffGroupId);
+        if (! $group) {
+            return false;
+        }
+
+        $this->zone_id = $group->zone_id;
+        $this->shift_id = $group->shift_id;
+        $this->vehicle_id = $group->vehicle_id;
+        $this->driver_id = $group->driver_id;
+        $this->helper_one_id = $group->helper_one_id;
+        $this->helper_two_id = $group->helper_two_id;
+        $this->work_days = $group->work_days ?? [];
+
+        if ($this->editingId) {
+            $this->syncSingleDayWorkDay();
+        }
+
+        return true;
+    }
+
     private function validateDifferentPeople(): void
     {
         $selected = array_filter([$this->driver_id, $this->helper_one_id, $this->helper_two_id]);
         if (count($selected) !== count(array_unique($selected))) {
             $this->availabilityErrors[] = 'Un trabajador no puede ocupar mas de un rol en la misma programacion.';
         }
+    }
+
+    private function validateHolidays($dates, $schedulableDates): void
+    {
+        $holidays = $this->holidaysForDates($dates);
+
+        if ($holidays->isEmpty()) {
+            return;
+        }
+
+        $message = 'Se omitiran los dias feriados: '.$this->summarizeHolidays($holidays).'.';
+
+        if ($this->start_date === $this->end_date || $schedulableDates->isEmpty()) {
+            $this->availabilityErrors[] = 'No se puede registrar programacion en dias feriados: '.$this->summarizeHolidays($holidays).'.';
+
+            return;
+        }
+
+        $this->availabilityWarnings[] = $message;
+    }
+
+    private function holidaysForDates($dates)
+    {
+        $holidayDates = $dates
+            ->map(fn ($date) => $date->format('Y-m-d'))
+            ->values()
+            ->all();
+
+        if (empty($holidayDates)) {
+            return collect();
+        }
+
+        return Holiday::whereIn('date', $holidayDates)->orderBy('date')->get();
+    }
+
+    private function summarizeHolidays($holidays): string
+    {
+        return $holidays
+            ->map(fn (Holiday $holiday) => $holiday->date->format('d/m/Y').' ('.$holiday->name.')')
+            ->implode(', ');
     }
 
     private function validateContractsAndVacations($dates): void
@@ -538,7 +653,7 @@ new class extends Component {
 
     private function summarizeDates(array $dates): string
     {
-        $dates = collect($dates)->sortBy(fn (Carbon $date) => $date->format('Y-m-d'))->values();
+        $dates = collect($dates)->sortBy(fn ($date) => $date->format('Y-m-d'))->values();
 
         if ($dates->isEmpty()) {
             return 'el rango seleccionado';
@@ -615,6 +730,7 @@ new class extends Component {
             'availabilityValid',
             'formChangedAfterValidation',
             'availabilityErrors',
+            'availabilityWarnings',
             'availabilitySuggestions',
         ]);
 
@@ -803,7 +919,18 @@ new class extends Component {
                     </div>
                 @endif
 
-                @if ($availabilityChecked && ! $availabilityValid)
+                @if ($availabilityChecked && ! $formChangedAfterValidation && ! empty($availabilityWarnings))
+                    <div class="max-h-40 overflow-y-auto rounded-md border border-amber-300 bg-amber-50 px-5 py-4 text-sm font-semibold leading-relaxed text-amber-800">
+                        <div class="mb-2 font-bold">{{ __('Avisos') }}</div>
+                        <ul class="list-disc pl-5 space-y-1">
+                            @foreach ($availabilityWarnings as $warning)
+                                <li>{{ $warning }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if ($availabilityChecked && ! $formChangedAfterValidation && ! $availabilityValid)
                     <div class="max-h-48 overflow-y-auto rounded-md bg-[#E53935] px-5 py-4 text-sm font-semibold leading-relaxed text-white">
                         <div class="mb-2 font-bold">{{ __('Hay errores que corregir') }}</div>
                         <ul class="list-disc pl-5 space-y-1">
@@ -820,14 +947,14 @@ new class extends Component {
                             </ul>
                         @endif
                     </div>
-                @elseif ($availabilityChecked && $availabilityValid)
+                @elseif ($availabilityChecked && ! $formChangedAfterValidation && $availabilityValid)
                     <div class="rounded-md bg-[#28a745] px-5 py-4 text-sm font-semibold text-white">
                         {{ __('Todo esta correcto. Puede guardar la programacion.') }}
                     </div>
                 @endif
 
                 <div class="grid gap-4 rounded-md border border-gray-200 bg-gray-50 p-4 md:grid-cols-4">
-                    <flux:select wire:model.live="zone_id" label="Zona" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="zone_id" label="Zona" disabled>
                         <option value="">{{ __('Seleccione') }}</option>
                         @foreach ($this->zones as $zone)
                             <option value="{{ $zone->id }}">{{ $zone->name }}</option>
@@ -854,7 +981,7 @@ new class extends Component {
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-3">
-                    <flux:select wire:model.live="driver_id" label="Conductor *" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="driver_id" label="Conductor *" disabled>
                         <option value="">{{ __('Seleccione') }}</option>
                         @foreach ($this->employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
