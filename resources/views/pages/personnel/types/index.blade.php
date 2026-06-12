@@ -7,7 +7,6 @@ use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Flux\Flux;
 
-
 new class extends Component {
     use WithPagination;
 
