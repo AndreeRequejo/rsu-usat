@@ -888,9 +888,9 @@ new class extends Component
 
     <flux:modal name="scheduling-form" wire:close="closeModal" class="w-[96vw]! md:w-[1320px]! max-w-none! max-h-[92vh] overflow-y-auto">
         <form wire:submit="save" class="space-y-5" novalidate>
-            <div class="bg-[#2E8B57] px-6 py-4 text-white">
+            <div class="px-6 py-4">
                 <div class="flex items-center justify-between">
-                    <flux:heading size="lg" class="text-white">{{ $modalTitle }}</flux:heading>
+                    <flux:heading size="lg">{{ $modalTitle }}</flux:heading>
                 </div>
             </div>
 

@@ -19,6 +19,14 @@
         </div>
         <div class="flex gap-2">
             <flux:button
+                x-on:click="Flux.modal('zone-explorer').show()"
+                variant="primary"
+                icon="map"
+                class="bg-[#1A237E]! text-white cursor-pointer hover:bg-[#283593]!"
+            >
+                {{ __('Explorador de zonas') }}
+            </flux:button>
+            <flux:button
                 wire:click="openCreate"
                 variant="primary"
                 icon="plus-circle"
@@ -63,4 +71,5 @@
     @include('pages.scheduling.zones.components.edit')
     @include('pages.scheduling.zones.components.delete')
     @include('pages.scheduling.zones.components.viewer-modal')
+    @include('pages.scheduling.zones.components.zone-explorer-modal')
 </div>

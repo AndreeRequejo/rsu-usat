@@ -4,12 +4,12 @@
     wire:close="closeFormModal"
 >
     <div class="flex flex-col h-full">
-        <div class="px-6 py-4 border-b border-[#A5D6A7] shrink-0 flex items-center justify-between" style="background-color: #1976D2;">
-            <div class="flex items-center gap-2 text-white">
+        <div class="px-6 py-4 border-b border-[#A5D6A7] shrink-0 flex items-center justify-between">
+            <div class="flex items-center gap-2">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-                <flux:heading size="lg" class="text-white">
+                <flux:heading size="lg">
                     {{ $editingId ? __('Editar Feriado') : __('Nuevo Dia Feriado') }}
                 </flux:heading>
             </div>
