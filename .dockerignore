@@ -1,21 +1,33 @@
-node_modules/
+# Dependencias — se generan en el multi-stage build
 vendor/
+node_modules/
 
-storage/logs/*.log
-storage/framework/cache/*
-storage/framework/sessions/*
-storage/framework/views/*
+# Caches de Laravel generados en local
+bootstrap/cache/packages.php
+bootstrap/cache/services.php
 
+# Entornos locales
+.env
+.env.*
+!.env.example
+
+# Git
 .git/
-.github/
-.vscode/
+.gitignore
 
+# Tests
 tests/
 
-*.md
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
 
-.editorconfig
-.gitignore
-.gitattributes
+# IDEs
+.idea/
+.vscode/
+*.code-workspace
 
-docker-compose.yml
+# OS
+.DS_Store
+Thumbs.db

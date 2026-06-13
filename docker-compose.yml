@@ -1,52 +1,116 @@
 services:
 
+  # =============================================================
+  # 1. Aplicación Laravel (PHP-FPM)
+  # =============================================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-laravel}/app:latest
     container_name: laravel_app
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Estos valores deben coincidir con el servicio mysql de abajo
+      DB_HOST: mysql
+      DB_PORT: 3306
     volumes:
-      - ./:/var/www
+      # NO montar ./:/var/www → sobreescribiría la imagen compilada
+      # Solo montar lo que necesita persistencia en runtime
+      - app-storage:/var/www/storage
+      - app-cache:/var/www/bootstrap/cache
+      # public/build se comparte de solo lectura con nginx
+      - app-public:/var/www/public/build
     networks:
       - laravel
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # El healthcheck del Dockerfile (php-fpm -t) aplica aquí
+    # nginx esperará a que este servicio esté healthy
 
+  # =============================================================
+  # 2. Servidor Web (Nginx)
+  # =============================================================
   nginx:
     build:
       context: .
       dockerfile: docker/nginx/Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-laravel}/nginx:latest
     container_name: laravel_nginx
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${APP_PORT:-8080}:80"
     volumes:
-      - ./:/var/www
-    depends_on:
-      - app
+      # Solo los assets compilados en modo lectura
+      - app-public:/var/www/public/build:ro
     networks:
       - laravel
+    depends_on:
+      app:
+        # Nginx espera a que PHP-FPM esté sano antes de arrancar
+        condition: service_healthy
 
+  # =============================================================
+  # 3. Base de Datos (MySQL 8.0)
+  # =============================================================
   mysql:
     image: mysql:8.0
     container_name: laravel_mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: laravel
-      MYSQL_USER: laravel
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
     ports:
-      - "3306:3306"
+      # Solo exponer externamente en desarrollo; en producción quitar esto
+      - "${DB_PORT_EXTERNAL:-33066}:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+      - db-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - laravel
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_ROOT_PASSWORD:-root_password}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-volumes:
-  mysql_data:
-
+# =============================================================
+# Redes
+# =============================================================
 networks:
   laravel:
+    driver: bridge
+    name: laravel-network
+
+# =============================================================
+# Volúmenes Persistentes
+# =============================================================
+volumes:
+  db-data:
+    driver: local
+    name: laravel-db-data
+  app-storage:
+    driver: local
+    name: laravel-storage
+  app-cache:
+    driver: local
+    name: laravel-cache
+  app-public:
+    driver: local
+    name: laravel-public
