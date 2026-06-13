@@ -13,22 +13,17 @@ services:
     env_file:
       - .env
     environment:
-      # Estos valores deben coincidir con el servicio mysql de abajo
       DB_HOST: mysql
       DB_PORT: 3306
     volumes:
-      # NO montar ./:/var/www → sobreescribiría la imagen compilada
-      # Solo montar lo que necesita persistencia en runtime
       - app-storage:/var/www/storage
       - app-cache:/var/www/bootstrap/cache
-      # public/build se comparte de solo lectura con nginx
       - app-public:/var/www/public/build
     networks:
       - laravel
     depends_on:
       mysql:
         condition: service_healthy
-    # El healthcheck del Dockerfile (php-fpm -t) aplica aquí
     # nginx esperará a que este servicio esté healthy
 
   # =============================================================
@@ -50,7 +45,6 @@ services:
       - laravel
     depends_on:
       app:
-        # Nginx espera a que PHP-FPM esté sano antes de arrancar
         condition: service_healthy
 
   # =============================================================

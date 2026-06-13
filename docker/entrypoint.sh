@@ -6,8 +6,6 @@ echo "============================================"
 echo " Laravel Entrypoint"
 echo "============================================"
 
-# Fijar permisos en runtime (necesario cuando los volúmenes
-# se montan como root sobre los directorios de la imagen)
 chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
