@@ -73,10 +73,62 @@ new class extends Component
 
     public array $availabilitySuggestions = [];
 
+    public string $change_reason = '';
+
+    public ?int $change_shift_id = null;
+
+    public ?int $change_vehicle_id = null;
+
+    public string $change_person_role = '';
+
+    public ?int $change_person_id = null;
+
+    public string $change_turn_reason_preset = '';
+
+    public string $change_vehicle_reason_preset = '';
+
+    public string $change_person_reason_preset = '';
+
+    public string $change_turn_reason = '';
+
+    public string $change_vehicle_reason = '';
+
+    public string $change_person_reason = '';
+
+    public array $registeredChanges = [];
+
+    public string $turnChangeFeedback = '';
+
+    public string $turnChangeFeedbackType = '';
+
+    public string $vehicleChangeFeedback = '';
+
+    public string $vehicleChangeFeedbackType = '';
+
+    public string $personChangeFeedback = '';
+
+    public string $personChangeFeedbackType = '';
+
+    public string $massive_start_date = '';
+
+    public string $massive_end_date = '';
+
+    public string $massive_shift_filter = '';
+
+    public array $massiveGroups = [];
+
+    public array $massiveExcludedHolidayDates = [];
+
+    public array $massiveValidation = [];
+
+    public bool $massiveValidated = false;
+
     public function mount(): void
     {
-        $this->filterStart = now()->startOfMonth()->format('Y-m-d');
-        $this->filterEnd = now()->endOfMonth()->format('Y-m-d');
+        $today = now('America/Lima')->format('Y-m-d');
+
+        $this->filterStart = $today;
+        $this->filterEnd = $today;
     }
 
     protected function rules(): array
@@ -90,7 +142,7 @@ new class extends Component
         return [
             'start_date' => ['required', 'date'],
             'end_date' => $endDateRules,
-            'staff_group_id' => ['required', 'exists:staff_groups,id'],
+            'staff_group_id' => [$this->editingId ? 'nullable' : 'required', 'exists:staff_groups,id'],
             'zone_id' => ['required', 'exists:zones,id'],
             'shift_id' => ['required', 'exists:shifts,id'],
             'vehicle_id' => ['required', 'exists:vehicles,id'],
@@ -99,6 +151,7 @@ new class extends Component
             'helper_two_id' => ['nullable', 'exists:employees,id', 'different:driver_id', 'different:helper_one_id'],
             'work_days' => ['required', 'array', 'min:1'],
             'notes' => ['nullable', 'string'],
+            'change_reason' => [$this->editingId ? 'required' : 'nullable', 'string'],
         ];
     }
 
@@ -118,6 +171,7 @@ new class extends Component
             'helper_two_id.different' => 'El ayudante 2 no puede repetir conductor ni ayudante 1.',
             'work_days.required' => 'Seleccione al menos un dia de trabajo.',
             'work_days.min' => 'Seleccione al menos un dia de trabajo.',
+            'change_reason.required' => 'Ingrese el motivo del cambio.',
         ];
     }
 
@@ -172,6 +226,47 @@ new class extends Component
         $this->markAvailabilityDirty();
     }
 
+    public function updatedChangeTurnReasonPreset($value): void
+    {
+        $this->change_turn_reason = $value ?: '';
+    }
+
+    public function updatedChangeVehicleReasonPreset($value): void
+    {
+        $this->change_vehicle_reason = $value ?: '';
+    }
+
+    public function updatedChangePersonReasonPreset($value): void
+    {
+        $this->change_person_reason = $value ?: '';
+    }
+
+    public function updatedMassiveStartDate(): void
+    {
+        $this->syncMassiveHolidaySelection();
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
+    public function updatedMassiveEndDate(): void
+    {
+        $this->syncMassiveHolidaySelection();
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
+    public function updatedMassiveExcludedHolidayDates(): void
+    {
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
+    public function updatedMassiveGroups(): void
+    {
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
     public function openCreate(): void
     {
         $this->resetForm();
@@ -181,9 +276,21 @@ new class extends Component
 
     public function openMassive(): void
     {
-        $this->resetForm();
-        $this->modalTitle = 'Programacion Masiva';
-        Flux::modal('scheduling-form')->show();
+        $this->resetMassiveForm();
+        $this->loadMassiveGroups();
+        Flux::modal('massive-scheduling-form')->show();
+    }
+
+    public function closeMassiveModal(): void
+    {
+        $this->resetMassiveForm();
+        Flux::modal('massive-scheduling-form')->close();
+    }
+
+    public function setMassiveShiftFilter(string $shiftId = ''): void
+    {
+        $this->massive_shift_filter = $shiftId;
+        $this->loadMassiveGroups();
     }
 
     public function openEdit(int $id): void
@@ -210,8 +317,9 @@ new class extends Component
         $this->staff_group_id = $this->matchingStaffGroupId();
         $this->work_days = [$scheduling->date->dayOfWeekIso];
         $this->notes = $scheduling->notes ?? '';
+        $this->resetReprogrammingForm();
         $this->markAvailabilityDirty();
-        Flux::modal('scheduling-form')->show();
+        Flux::modal('reprogramming-form')->show();
     }
 
     public function closeModal(): void
@@ -222,7 +330,10 @@ new class extends Component
 
     public function validateAvailability(): void
     {
-        $this->syncStaffGroupValues($this->staff_group_id);
+        if (! $this->editingId) {
+            $this->syncStaffGroupValues($this->staff_group_id);
+        }
+
         $this->validate();
         $this->availabilityErrors = [];
         $this->availabilityWarnings = [];
@@ -252,7 +363,10 @@ new class extends Component
 
     public function save(): void
     {
-        $this->syncStaffGroupValues($this->staff_group_id);
+        if (! $this->editingId) {
+            $this->syncStaffGroupValues($this->staff_group_id);
+        }
+
         $this->validate();
 
         if (! $this->availabilityChecked || ! $this->availabilityValid || $this->formChangedAfterValidation) {
@@ -286,10 +400,11 @@ new class extends Component
                 'shift_id' => $this->shift_id,
                 'vehicle_id' => $this->vehicle_id,
                 'zone_id' => $this->zone_id,
+                'status' => 'Reprogramado',
                 'notes' => $this->notes,
             ]);
             $this->syncGroupDetails($scheduling);
-            $this->writeHistory($scheduling->id, 'Actualizacion', 'Se modifico la programacion.', ['before' => $before, 'after' => $scheduling->fresh()->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes'])]);
+            $this->writeHistory($scheduling->id, 'Reprogramacion', $this->change_reason, ['before' => $before, 'after' => $scheduling->fresh()->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes'])]);
             Flux::toast(variant: 'success', text: 'Programacion actualizada.');
         } else {
             foreach ($schedulableDates as $date) {
@@ -309,6 +424,268 @@ new class extends Component
 
         $this->resetForm();
         Flux::modal('scheduling-form')->close();
+    }
+
+    public function closeReprogrammingModal(): void
+    {
+        $this->resetForm();
+        Flux::modal('reprogramming-form')->close();
+    }
+
+    public function addTurnChange(): void
+    {
+        $this->validate([
+            'change_shift_id' => ['required', 'exists:shifts,id', 'different:shift_id'],
+            'change_turn_reason' => ['required', 'string'],
+        ], [
+            'change_shift_id.required' => 'Seleccione un nuevo turno.',
+            'change_shift_id.different' => 'Seleccione un turno diferente al actual.',
+            'change_turn_reason.required' => 'Ingrese el motivo del cambio de turno.',
+        ]);
+
+        $errors = $this->validateReprogrammingState($this->reprogrammingState(['shift_id' => $this->change_shift_id]));
+        if (! empty($errors)) {
+            $this->turnChangeFeedback = implode(' ', $errors);
+            $this->turnChangeFeedbackType = 'error';
+
+            return;
+        }
+
+        $shift = Shift::find($this->change_shift_id);
+
+        $this->upsertRegisteredChange([
+            'type' => 'turn',
+            'label' => 'Turno',
+            'field' => 'shift_id',
+            'old_id' => $this->shift_id,
+            'new_id' => $this->change_shift_id,
+            'old_value' => $this->shiftLabel($this->shift_id),
+            'new_value' => $this->shiftLabel($shift?->id),
+            'reason' => $this->change_turn_reason,
+        ]);
+
+        $this->reset(['change_shift_id', 'change_turn_reason_preset', 'change_turn_reason']);
+        $this->turnChangeFeedback = 'Turno disponible para el cambio';
+        $this->turnChangeFeedbackType = 'success';
+    }
+
+    public function addVehicleChange(): void
+    {
+        $this->validate([
+            'change_vehicle_id' => ['required', 'exists:vehicles,id', 'different:vehicle_id'],
+            'change_vehicle_reason' => ['required', 'string'],
+        ], [
+            'change_vehicle_id.required' => 'Seleccione un nuevo vehiculo.',
+            'change_vehicle_id.different' => 'Seleccione un vehiculo diferente al actual.',
+            'change_vehicle_reason.required' => 'Ingrese el motivo del cambio de vehiculo.',
+        ]);
+
+        $errors = $this->validateReprogrammingState($this->reprogrammingState(['vehicle_id' => $this->change_vehicle_id]));
+        if (! empty($errors)) {
+            $this->vehicleChangeFeedback = implode(' ', $errors);
+            $this->vehicleChangeFeedbackType = 'error';
+
+            return;
+        }
+
+        $vehicle = Vehicle::find($this->change_vehicle_id);
+
+        $this->upsertRegisteredChange([
+            'type' => 'vehicle',
+            'label' => 'Vehiculo',
+            'field' => 'vehicle_id',
+            'old_id' => $this->vehicle_id,
+            'new_id' => $this->change_vehicle_id,
+            'old_value' => $this->vehicleLabel($this->vehicle_id),
+            'new_value' => $this->vehicleLabel($vehicle?->id),
+            'reason' => $this->change_vehicle_reason,
+        ]);
+
+        $this->reset(['change_vehicle_id', 'change_vehicle_reason_preset', 'change_vehicle_reason']);
+        $this->vehicleChangeFeedback = 'Vehiculo disponible para el cambio';
+        $this->vehicleChangeFeedbackType = 'success';
+    }
+
+    public function addPersonChange(): void
+    {
+        $currentPersonId = $this->personIdForRole($this->change_person_role);
+
+        $this->validate([
+            'change_person_role' => ['required', 'in:driver_id,helper_one_id,helper_two_id'],
+            'change_person_id' => ['required', 'exists:employees,id', 'different:'.$this->change_person_role],
+            'change_person_reason' => ['required', 'string'],
+        ], [
+            'change_person_role.required' => 'Seleccione el personal actual.',
+            'change_person_id.required' => 'Seleccione el nuevo personal.',
+            'change_person_reason.required' => 'Ingrese el motivo del cambio de personal.',
+        ]);
+
+        if ((int) $currentPersonId === (int) $this->change_person_id) {
+            $this->addError('change_person_id', 'Seleccione un trabajador diferente al actual.');
+
+            return;
+        }
+
+        $errors = $this->validateReprogrammingState($this->reprogrammingState([$this->change_person_role => $this->change_person_id]));
+        if (! empty($errors)) {
+            $this->personChangeFeedback = implode(' ', $errors);
+            $this->personChangeFeedbackType = 'error';
+
+            return;
+        }
+
+        $this->upsertRegisteredChange([
+            'type' => 'person',
+            'label' => $this->roleLabel($this->change_person_role),
+            'field' => $this->change_person_role,
+            'old_id' => $currentPersonId,
+            'new_id' => $this->change_person_id,
+            'old_value' => $this->employeeName(Employee::find($currentPersonId)),
+            'new_value' => $this->employeeName(Employee::find($this->change_person_id)),
+            'reason' => $this->change_person_reason,
+        ]);
+
+        $this->reset(['change_person_role', 'change_person_id', 'change_person_reason_preset', 'change_person_reason']);
+        $this->personChangeFeedback = 'Personal disponible para el cambio';
+        $this->personChangeFeedbackType = 'success';
+    }
+
+    public function removeRegisteredChange(int $index): void
+    {
+        unset($this->registeredChanges[$index]);
+        $this->registeredChanges = array_values($this->registeredChanges);
+    }
+
+    public function applyReprogramming(): void
+    {
+        if (! $this->editingId) {
+            return;
+        }
+
+        if (empty($this->registeredChanges)) {
+            Flux::toast(variant: 'warning', text: 'Agregue al menos un cambio.');
+
+            return;
+        }
+
+        $scheduling = Scheduling::with('groupDetails')->findOrFail($this->editingId);
+        $before = [
+            'date' => $scheduling->date?->format('Y-m-d'),
+            'shift_id' => $scheduling->shift_id,
+            'vehicle_id' => $scheduling->vehicle_id,
+            'zone_id' => $scheduling->zone_id,
+            'status' => $scheduling->status,
+            'employees' => $scheduling->groupDetails->pluck('employee_id')->values()->all(),
+        ];
+
+        foreach ($this->registeredChanges as $change) {
+            if ($change['field'] === 'shift_id') {
+                $this->shift_id = (int) $change['new_id'];
+            }
+
+            if ($change['field'] === 'vehicle_id') {
+                $this->vehicle_id = (int) $change['new_id'];
+            }
+
+            if (in_array($change['field'], ['driver_id', 'helper_one_id', 'helper_two_id'], true)) {
+                $this->{$change['field']} = (int) $change['new_id'];
+            }
+        }
+
+        $this->availabilityErrors = $this->validateReprogrammingState($this->reprogrammingState());
+
+        if (! empty($this->availabilityErrors)) {
+            Flux::toast(variant: 'warning', text: 'Hay inconsistencias por corregir.');
+
+            return;
+        }
+
+        $scheduling->update([
+            'shift_id' => $this->shift_id,
+            'vehicle_id' => $this->vehicle_id,
+            'status' => 'Reprogramado',
+            'notes' => $this->notes,
+        ]);
+
+        $this->syncGroupDetails($scheduling);
+
+        foreach ($this->registeredChanges as $change) {
+            $this->writeHistory($scheduling->id, 'Reprogramacion - '.$change['label'], $change['reason'], [
+                'before' => $change['old_value'],
+                'after' => $change['new_value'],
+                'snapshot_before' => $before,
+            ]);
+        }
+
+        Flux::toast(variant: 'success', text: 'Programacion reprogramada.');
+        $this->resetForm();
+        Flux::modal('reprogramming-form')->close();
+    }
+
+    public function validateMassiveAvailability(): void
+    {
+        $this->validate([
+            'massive_start_date' => ['required', 'date'],
+            'massive_end_date' => ['required', 'date', 'after_or_equal:massive_start_date'],
+        ], [
+            'massive_start_date.required' => 'La fecha de inicio es obligatoria.',
+            'massive_end_date.required' => 'La fecha de fin es obligatoria.',
+            'massive_end_date.after_or_equal' => 'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+        ]);
+
+        if (empty($this->massiveGroups)) {
+            $this->loadMassiveGroups();
+        }
+
+        $this->massiveValidated = true;
+        $this->massiveValidation = $this->buildMassiveValidation();
+    }
+
+    public function removeMassiveGroup(int $groupId): void
+    {
+        unset($this->massiveGroups[$groupId], $this->massiveValidation[$groupId]);
+        $this->massiveGroups = array_filter($this->massiveGroups);
+    }
+
+    public function saveMassiveScheduling(): void
+    {
+        $this->validateMassiveAvailability();
+
+        if ($this->massiveHasErrors()) {
+            Flux::toast(variant: 'warning', text: 'Corrija las inconsistencias detectadas.');
+
+            return;
+        }
+
+        $created = 0;
+
+        foreach ($this->massiveGroups as $groupId => $groupData) {
+            foreach ($this->massiveDatesForGroup($groupData) as $date) {
+                $scheduling = Scheduling::create([
+                    'date' => $date->format('Y-m-d'),
+                    'shift_id' => $groupData['shift_id'],
+                    'vehicle_id' => $groupData['vehicle_id'],
+                    'zone_id' => $groupData['zone_id'],
+                    'status' => 'Programado',
+                    'notes' => 'Programacion masiva',
+                ]);
+
+                foreach ($this->massiveSelectedEmployeeIds($groupData) as $employeeId) {
+                    $scheduling->groupDetails()->create(['employee_id' => $employeeId]);
+                }
+
+                $this->writeHistory($scheduling->id, 'Creacion masiva', 'Se genero la programacion masiva desde el grupo '.$groupData['name'].'.', [
+                    'group_id' => $groupId,
+                    'date' => $date->format('Y-m-d'),
+                ]);
+
+                $created++;
+            }
+        }
+
+        Flux::toast(variant: 'success', text: 'Programacion masiva generada: '.$created.' registro(s).');
+        $this->resetMassiveForm();
+        Flux::modal('massive-scheduling-form')->close();
     }
 
     public function finish(int $id): void
@@ -355,8 +732,10 @@ new class extends Component
 
     public function clearFilters(): void
     {
-        $this->filterStart = now()->startOfMonth()->format('Y-m-d');
-        $this->filterEnd = now()->endOfMonth()->format('Y-m-d');
+        $today = now('America/Lima')->format('Y-m-d');
+
+        $this->filterStart = $today;
+        $this->filterEnd = $today;
         $this->zoneFilter = '';
         $this->shiftFilter = '';
         $this->search = '';
@@ -423,6 +802,30 @@ new class extends Component
         return SchedulingHistory::with('user')
             ->where('scheduling_id', $this->historyId)
             ->latest()
+            ->get();
+    }
+
+    #[Computed]
+    public function historyScheduling()
+    {
+        if (! $this->historyId) {
+            return null;
+        }
+
+        return Scheduling::with('groupDetails.employee')->find($this->historyId);
+    }
+
+    #[Computed]
+    public function massiveHolidays()
+    {
+        if (! $this->massive_start_date || ! $this->massive_end_date) {
+            return collect();
+        }
+
+        return Holiday::where('is_active', true)
+            ->whereDate('date', '>=', $this->massive_start_date)
+            ->whereDate('date', '<=', $this->massive_end_date)
+            ->orderBy('date')
             ->get();
     }
 
@@ -513,6 +916,484 @@ new class extends Component
         }
 
         return true;
+    }
+
+    private function resetReprogrammingForm(): void
+    {
+        $this->reset([
+            'change_shift_id',
+            'change_vehicle_id',
+            'change_person_role',
+            'change_person_id',
+            'change_turn_reason_preset',
+            'change_vehicle_reason_preset',
+            'change_person_reason_preset',
+            'change_turn_reason',
+            'change_vehicle_reason',
+            'change_person_reason',
+            'registeredChanges',
+            'availabilityErrors',
+            'turnChangeFeedback',
+            'turnChangeFeedbackType',
+            'vehicleChangeFeedback',
+            'vehicleChangeFeedbackType',
+            'personChangeFeedback',
+            'personChangeFeedbackType',
+        ]);
+    }
+
+    private function resetMassiveForm(): void
+    {
+        $today = now('America/Lima')->format('Y-m-d');
+
+        $this->massive_start_date = $today;
+        $this->massive_end_date = $today;
+        $this->massive_shift_filter = '';
+        $this->massiveGroups = [];
+        $this->massiveExcludedHolidayDates = [];
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
+    private function loadMassiveGroups(): void
+    {
+        $this->massiveGroups = StaffGroup::with(['zone', 'shift', 'vehicle', 'driver', 'helperOne', 'helperTwo'])
+            ->where('active', true)
+            ->when($this->massive_shift_filter !== '', fn ($query) => $query->where('shift_id', $this->massive_shift_filter))
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(function (StaffGroup $group) {
+                return [
+                    $group->id => [
+                        'id' => $group->id,
+                        'name' => $group->name,
+                        'zone_id' => $group->zone_id,
+                        'zone_name' => $group->zone?->name ?? '-',
+                        'shift_id' => $group->shift_id,
+                        'shift_name' => $group->shift?->name ?? '-',
+                        'vehicle_id' => $group->vehicle_id,
+                        'vehicle_label' => $this->vehicleLabel($group->vehicle_id),
+                        'vehicle_capacity' => $group->vehicle?->occupant_capacity,
+                        'driver_id' => $group->driver_id,
+                        'helper_one_id' => $group->helper_one_id,
+                        'helper_two_id' => $group->helper_two_id,
+                        'work_days' => $group->work_days ?? [],
+                    ],
+                ];
+            })
+            ->all();
+
+        $this->syncMassiveHolidaySelection();
+        $this->massiveValidation = [];
+        $this->massiveValidated = false;
+    }
+
+    private function syncMassiveHolidaySelection(): void
+    {
+        $holidayDates = $this->massiveHolidays
+            ->map(fn (Holiday $holiday) => $holiday->date->format('Y-m-d'))
+            ->all();
+
+        $this->massiveExcludedHolidayDates = array_values(array_intersect($this->massiveExcludedHolidayDates, $holidayDates));
+
+        if (empty($this->massiveExcludedHolidayDates)) {
+            $this->massiveExcludedHolidayDates = $holidayDates;
+        }
+    }
+
+    private function massiveRangeDates()
+    {
+        if (! $this->massive_start_date || ! $this->massive_end_date) {
+            return collect();
+        }
+
+        return collect(CarbonPeriod::create($this->massive_start_date, $this->massive_end_date))->values();
+    }
+
+    private function massiveDatesForGroup(array $groupData)
+    {
+        $workDays = array_map('intval', $groupData['work_days'] ?? []);
+
+        return $this->massiveRangeDates()
+            ->filter(fn ($date) => in_array($date->dayOfWeekIso, $workDays, true))
+            ->reject(fn ($date) => in_array($date->format('Y-m-d'), $this->massiveExcludedHolidayDates, true))
+            ->values();
+    }
+
+    private function massiveUncoveredDates(array $groupData)
+    {
+        $workDays = array_map('intval', $groupData['work_days'] ?? []);
+
+        return $this->massiveRangeDates()
+            ->reject(fn ($date) => in_array($date->format('Y-m-d'), $this->massiveExcludedHolidayDates, true))
+            ->reject(fn ($date) => in_array($date->dayOfWeekIso, $workDays, true))
+            ->values();
+    }
+
+    private function massiveSelectedEmployeeIds(array $groupData): array
+    {
+        return collect([$groupData['driver_id'], $groupData['helper_one_id'], $groupData['helper_two_id']])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function buildMassiveValidation(): array
+    {
+        $validation = [];
+        $proposedVehicles = [];
+        $proposedEmployees = [];
+
+        foreach ($this->massiveGroups as $groupId => $groupData) {
+            $errors = [];
+            $warnings = [];
+            $roleErrors = [];
+            $roleWarnings = [];
+            $dates = $this->massiveDatesForGroup($groupData);
+            $uncoveredDates = $this->massiveUncoveredDates($groupData);
+            $employeeIds = $this->massiveSelectedEmployeeIds($groupData);
+
+            if ($dates->isEmpty()) {
+                $errors[] = 'No hay dias laborables para programar en el rango seleccionado.';
+            }
+
+            if ($uncoveredDates->isNotEmpty()) {
+                $warnings[] = 'Dias no cubiertos: '.$uncoveredDates->count().' dia(s) no cubierto(s) (el grupo solo trabaja: '.$this->workDaysLabel($groupData['work_days']).').';
+            }
+
+            if (count($employeeIds) !== count(array_unique($employeeIds))) {
+                $errors[] = 'Personal duplicado dentro del grupo.';
+                $roleErrors['driver_id'][] = 'Duplicado en la misma programacion.';
+                $roleErrors['helper_one_id'][] = 'Duplicado en la misma programacion.';
+                $roleErrors['helper_two_id'][] = 'Duplicado en la misma programacion.';
+            }
+
+            foreach ($dates as $date) {
+                $dateKey = $date->format('Y-m-d');
+                $vehicleKey = $dateKey.'|'.$groupData['shift_id'].'|'.$groupData['vehicle_id'];
+
+                if (isset($proposedVehicles[$vehicleKey])) {
+                    $errors[] = 'Vehiculo duplicado en '.$date->format('d/m/Y').' para el mismo turno.';
+                }
+
+                $proposedVehicles[$vehicleKey] = true;
+
+                if (Scheduling::whereDate('date', $dateKey)->where('shift_id', $groupData['shift_id'])->where('vehicle_id', $groupData['vehicle_id'])->exists()) {
+                    $errors[] = 'Vehiculo ya programado en '.$date->format('d/m/Y').' para el turno seleccionado.';
+                    $warnings[] = 'Programaciones existentes: '.$date->format('d/m/Y').'.';
+                }
+
+                foreach (['driver_id' => 'Conductor', 'helper_one_id' => 'Ayudante 1', 'helper_two_id' => 'Ayudante 2'] as $field => $label) {
+                    $employeeId = $groupData[$field] ?? null;
+                    if (! $employeeId) {
+                        continue;
+                    }
+
+                    $employeeKey = $dateKey.'|'.$groupData['shift_id'].'|'.$employeeId;
+                    $employee = Employee::find($employeeId);
+
+                    if (isset($proposedEmployees[$employeeKey])) {
+                        $message = $label.' '.$this->employeeName($employee).': Duplicado en '.$date->format('d/m/Y').'.';
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+
+                    $proposedEmployees[$employeeKey] = true;
+
+                    if (GroupDetail::where('employee_id', $employeeId)
+                        ->whereHas('scheduling', fn ($query) => $query->whereDate('date', $dateKey)->where('shift_id', $groupData['shift_id']))
+                        ->exists()) {
+                        $message = $label.' '.$this->employeeName($employee).': Ya programado en '.$date->format('d/m/Y').'.';
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+
+                    $personProblems = $this->employeeDateProblems($employeeId, $date);
+                    foreach ($personProblems as $problem) {
+                        $message = $label.' '.$this->employeeName($employee).': '.$problem;
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+                }
+            }
+
+            foreach (['driver_id', 'helper_one_id', 'helper_two_id'] as $field) {
+                if (empty($roleErrors[$field])) {
+                    $roleWarnings[$field][] = $this->massiveValidated ? 'Disponible para el rango validado.' : 'Seleccione fechas para validar';
+                }
+            }
+
+            $validation[$groupId] = [
+                'errors' => array_values(array_unique($errors)),
+                'warnings' => array_values(array_unique($warnings)),
+                'role_errors' => $roleErrors,
+                'role_warnings' => $roleWarnings,
+                'dates_count' => $dates->count(),
+            ];
+        }
+
+        return $validation;
+    }
+
+    private function massiveHasErrors(): bool
+    {
+        return collect($this->massiveValidation)->contains(fn ($result) => ! empty($result['errors']));
+    }
+
+    private function employeeDateProblems(int $employeeId, $date): array
+    {
+        $employee = Employee::with('contracts')->find($employeeId);
+        if (! $employee) {
+            return ['Empleado no encontrado.'];
+        }
+
+        $problems = [];
+        $dateString = $date->format('Y-m-d');
+
+        $hasContract = $employee->contracts()
+            ->where('is_active', true)
+            ->whereDate('start_date', '<=', $dateString)
+            ->where(function ($query) use ($dateString) {
+                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $dateString);
+            })
+            ->exists();
+
+        if (! $hasContract) {
+            $problems[] = 'Contrato no vigente en '.$date->format('d/m/Y').'.';
+        }
+
+        $hasVacation = Vacation::where('employee_id', $employeeId)
+            ->where('status', 'Aprobada')
+            ->whereDate('start_date', '<=', $dateString)
+            ->whereDate('end_date', '>=', $dateString)
+            ->exists();
+
+        if ($hasVacation) {
+            $problems[] = 'Vacaciones aprobadas en '.$date->format('d/m/Y').'.';
+        }
+
+        return $problems;
+    }
+
+    public function workDaysLabel(array $workDays): string
+    {
+        $labels = [1 => 'Lunes', 2 => 'Martes', 3 => 'Miercoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sabado', 7 => 'Domingo'];
+
+        return collect($workDays)
+            ->map(fn ($day) => $labels[(int) $day] ?? null)
+            ->filter()
+            ->implode(', ');
+    }
+
+    private function upsertRegisteredChange(array $change): void
+    {
+        $this->registeredChanges = collect($this->registeredChanges)
+            ->reject(fn (array $registered) => $registered['field'] === $change['field'])
+            ->push($change)
+            ->values()
+            ->all();
+    }
+
+    private function reprogrammingState(array $overrides = []): array
+    {
+        $state = [
+            'shift_id' => $this->shift_id,
+            'vehicle_id' => $this->vehicle_id,
+            'driver_id' => $this->driver_id,
+            'helper_one_id' => $this->helper_one_id,
+            'helper_two_id' => $this->helper_two_id,
+        ];
+
+        foreach ($this->registeredChanges as $change) {
+            $state[$change['field']] = $change['new_id'];
+        }
+
+        return array_merge($state, $overrides);
+    }
+
+    private function validateReprogrammingState(array $state): array
+    {
+        $dates = $this->schedulableDates($this->selectedDates());
+        $errors = [];
+
+        if ($dates->isEmpty()) {
+            return ['No hay fecha laborable para validar el cambio.'];
+        }
+
+        $selectedEmployees = collect([$state['driver_id'], $state['helper_one_id'], $state['helper_two_id']])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($selectedEmployees->count() !== $selectedEmployees->unique()->count()) {
+            $errors[] = 'Un trabajador no puede ocupar mas de un rol en la misma programacion.';
+        }
+
+        foreach ($dates as $date) {
+            $vehicleConflict = Scheduling::whereDate('date', $date->format('Y-m-d'))
+                ->where('shift_id', $state['shift_id'])
+                ->where('vehicle_id', $state['vehicle_id'])
+                ->when($this->editingId, fn ($query) => $query->where('id', '!=', $this->editingId))
+                ->exists();
+
+            if ($vehicleConflict) {
+                $errors[] = 'El vehiculo ya tiene programacion en '.$date->format('d/m/Y').' para el turno seleccionado.';
+            }
+
+            foreach ($selectedEmployees as $employeeId) {
+                $employeeConflict = GroupDetail::where('employee_id', $employeeId)
+                    ->whereHas('scheduling', function ($query) use ($date, $state) {
+                        $query->whereDate('date', $date->format('Y-m-d'))
+                            ->where('shift_id', $state['shift_id'])
+                            ->when($this->editingId, fn ($q) => $q->where('id', '!=', $this->editingId));
+                    })
+                    ->exists();
+
+                if ($employeeConflict) {
+                    $errors[] = $this->employeeName(Employee::find($employeeId)).' ya tiene programacion en '.$date->format('d/m/Y').' para el turno seleccionado.';
+                }
+
+                $employee = Employee::with('contracts')->find($employeeId);
+                if (! $employee) {
+                    continue;
+                }
+
+                $hasContract = $employee->contracts()
+                    ->where('is_active', true)
+                    ->whereDate('start_date', '<=', $date->format('Y-m-d'))
+                    ->where(function ($query) use ($date) {
+                        $query->whereNull('end_date')->orWhereDate('end_date', '>=', $date->format('Y-m-d'));
+                    })
+                    ->exists();
+
+                if (! $hasContract) {
+                    $errors[] = $this->employeeName($employee).' no tiene contrato vigente en '.$date->format('d/m/Y').'.';
+                }
+
+                $hasVacation = Vacation::where('employee_id', $employeeId)
+                    ->where('status', 'Aprobada')
+                    ->whereDate('start_date', '<=', $date->format('Y-m-d'))
+                    ->whereDate('end_date', '>=', $date->format('Y-m-d'))
+                    ->exists();
+
+                if ($hasVacation) {
+                    $errors[] = $this->employeeName($employee).' tiene vacaciones aprobadas en '.$date->format('d/m/Y').'.';
+                }
+            }
+        }
+
+        return array_values(array_unique($errors));
+    }
+
+    private function personIdForRole(string $role): ?int
+    {
+        return match ($role) {
+            'driver_id' => $this->driver_id,
+            'helper_one_id' => $this->helper_one_id,
+            'helper_two_id' => $this->helper_two_id,
+            default => null,
+        };
+    }
+
+    public function roleLabel(string $role): string
+    {
+        return match ($role) {
+            'driver_id' => 'Conductor',
+            'helper_one_id' => 'Ayudante 1',
+            'helper_two_id' => 'Ayudante 2',
+            default => 'Personal',
+        };
+    }
+
+    public function shiftLabel(?int $shiftId): string
+    {
+        $shift = $this->shifts->firstWhere('id', $shiftId);
+
+        if (! $shift) {
+            return '-';
+        }
+
+        return $shift->name.' ('.substr($shift->hour_in, 0, 5).' - '.substr($shift->hour_out, 0, 5).')';
+    }
+
+    public function vehicleLabel(?int $vehicleId): string
+    {
+        $vehicle = $this->vehicles->firstWhere('id', $vehicleId);
+
+        if (! $vehicle) {
+            return '-';
+        }
+
+        return $vehicle->name.' - '.$vehicle->plate;
+    }
+
+    public function historyTypeLabel(SchedulingHistory $history): string
+    {
+        if (str_contains($history->action, 'Turno')) {
+            return 'Turno';
+        }
+
+        if (str_contains($history->action, 'Vehiculo')) {
+            return 'Vehiculo';
+        }
+
+        if (str_contains($history->action, 'Conductor') || str_contains($history->action, 'Ayudante') || str_contains($history->action, 'Personal')) {
+            return 'Personal';
+        }
+
+        return $history->action;
+    }
+
+    public function historyTypeClass(SchedulingHistory $history): string
+    {
+        return match ($this->historyTypeLabel($history)) {
+            'Turno' => 'bg-[#facc15] text-[#333333]',
+            'Vehiculo' => 'bg-[#075985] text-white',
+            'Personal' => 'bg-[#22c55e] text-white',
+            default => 'bg-gray-200 text-gray-700',
+        };
+    }
+
+    public function historyDate(SchedulingHistory $history): string
+    {
+        return $history->created_at?->timezone('America/Lima')->format('d/m/Y') ?? '-';
+    }
+
+    public function historyTime(SchedulingHistory $history): string
+    {
+        return $history->created_at?->timezone('America/Lima')->format('H:i') ?? '';
+    }
+
+    public function historyBefore(SchedulingHistory $history): string
+    {
+        return $this->historyValue($history->changes['before'] ?? null);
+    }
+
+    public function historyAfter(SchedulingHistory $history): string
+    {
+        return $this->historyValue($history->changes['after'] ?? null);
+    }
+
+    private function historyValue($value): string
+    {
+        if (blank($value)) {
+            return '-';
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->map(function ($item, $key) {
+                    if (is_array($item)) {
+                        $item = json_encode($item);
+                    }
+
+                    return is_string($key) ? $key.': '.$item : $item;
+                })
+                ->implode(', ');
+        }
+
+        return (string) $value;
     }
 
     private function validateDifferentPeople(): void
@@ -630,6 +1511,7 @@ new class extends Component
                 $employeeConflict = GroupDetail::where('employee_id', $employeeId)
                     ->whereHas('scheduling', function ($query) use ($date) {
                         $query->whereDate('date', $date->format('Y-m-d'))
+                            ->where('shift_id', $this->shift_id)
                             ->when($this->editingId, fn ($q) => $q->where('id', '!=', $this->editingId));
                     })
                     ->exists();
@@ -702,7 +1584,7 @@ new class extends Component
         ]);
     }
 
-    private function employeeName(?Employee $employee): string
+    public function employeeName(?Employee $employee): string
     {
         if (! $employee) {
             return 'Empleado';
@@ -726,6 +1608,7 @@ new class extends Component
             'helper_two_id',
             'work_days',
             'notes',
+            'change_reason',
             'availabilityChecked',
             'availabilityValid',
             'formChangedAfterValidation',
@@ -734,8 +1617,8 @@ new class extends Component
             'availabilitySuggestions',
         ]);
 
-        $this->start_date = now()->format('Y-m-d');
-        $this->end_date = now()->format('Y-m-d');
+        $this->start_date = now('America/Lima')->format('Y-m-d');
+        $this->end_date = now('America/Lima')->format('Y-m-d');
         $this->resetErrorBag();
         $this->resetValidation();
     }
@@ -825,7 +1708,7 @@ new class extends Component
                         <tr wire:key="scheduling-{{ $scheduling->id }}" class="{{ $scheduling->status === 'Finalizado' ? 'bg-green-50' : ($i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20') }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition">
                             <td class="px-4 py-3 font-medium">{{ $scheduling->date?->format('d/m/Y') }}</td>
                             <td class="px-4 py-3">
-                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $scheduling->status === 'Finalizado' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-cyan-100 text-cyan-700 border border-cyan-300' }}">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $scheduling->status === 'Finalizado' ? 'bg-green-100 text-green-700 border border-green-300' : ($scheduling->status === 'Reprogramado' ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-cyan-100 text-cyan-700 border border-cyan-300') }}">
                                     {{ $scheduling->status }}
                                 </span>
                             </td>
@@ -905,7 +1788,7 @@ new class extends Component
                     </div>
                 </div>
 
-                <flux:select wire:model.live="staff_group_id" label="Grupo de Personal *">
+                <flux:select wire:model.live="staff_group_id" label="Grupo de Personal *" :disabled="filled($editingId)">
                     <option value="">{{ __('Seleccione un grupo') }}</option>
                     @foreach ($this->groups as $group)
                         <option value="{{ $group->id }}">{{ $group->name }} - {{ $group->zone?->name }} - {{ $group->shift?->name }}</option>
@@ -960,13 +1843,13 @@ new class extends Component
                             <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                         @endforeach
                     </flux:select>
-                    <flux:select wire:model.live="shift_id" label="Turno" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="shift_id" label="Turno" :disabled="filled($staff_group_id) && ! filled($editingId)">
                         <option value="">{{ __('Seleccione') }}</option>
                         @foreach ($this->shifts as $shift)
                             <option value="{{ $shift->id }}">{{ $shift->name }} ({{ substr($shift->hour_in, 0, 5) }} - {{ substr($shift->hour_out, 0, 5) }})</option>
                         @endforeach
                     </flux:select>
-                    <flux:select wire:model.live="vehicle_id" label="Vehiculo" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="vehicle_id" label="Vehiculo" :disabled="filled($staff_group_id) && ! filled($editingId)">
                         <option value="">{{ __('Seleccione') }}</option>
                         @foreach ($this->vehicles as $vehicle)
                             <option value="{{ $vehicle->id }}">{{ $vehicle->name }} - {{ $vehicle->plate }}</option>
@@ -981,19 +1864,19 @@ new class extends Component
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-3">
-                    <flux:select wire:model.live="driver_id" label="Conductor *" disabled>
+                    <flux:select wire:model.live="driver_id" label="Conductor *" :disabled="! filled($editingId)">
                         <option value="">{{ __('Seleccione') }}</option>
                         @foreach ($this->employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                         @endforeach
                     </flux:select>
-                    <flux:select wire:model.live="helper_one_id" label="Ayudante 1" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="helper_one_id" label="Ayudante 1" :disabled="filled($staff_group_id) && ! filled($editingId)">
                         <option value="">{{ filled($staff_group_id) ? __('Vehiculo sin capacidad para un ayudante 1') : __('Seleccione') }}</option>
                         @foreach ($this->employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                         @endforeach
                     </flux:select>
-                    <flux:select wire:model.live="helper_two_id" label="Ayudante 2" :disabled="filled($staff_group_id) || filled($editingId)">
+                    <flux:select wire:model.live="helper_two_id" label="Ayudante 2" :disabled="filled($staff_group_id) && ! filled($editingId)">
                         <option value="">{{ filled($staff_group_id) ? __('Vehiculo sin capacidad para un ayudante 2') : __('Seleccione') }}</option>
                         @foreach ($this->employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -1014,6 +1897,10 @@ new class extends Component
                     @error('work_days') <span class="mt-1 block text-xs text-[#E53935]">{{ $message }}</span> @enderror
                 </div>
 
+                @if ($editingId)
+                    <flux:textarea wire:model="change_reason" label="Motivo del cambio *" rows="3" placeholder="Ingrese el motivo de la reprogramacion..." />
+                @endif
+
                 <flux:textarea wire:model="notes" label="Observaciones" rows="3" placeholder="Observaciones adicionales..." />
             </div>
 
@@ -1028,6 +1915,356 @@ new class extends Component
         </form>
     </flux:modal>
 
+    <flux:modal name="massive-scheduling-form" wire:close="closeMassiveModal" class="w-[98vw]! md:w-[1400px]! max-w-none! max-h-[94vh] overflow-y-auto">
+        <div class="space-y-5">
+            <div class="bg-[#075985] px-5 py-4 text-white">
+                <flux:heading size="lg" class="text-white">{{ __('Programacion Masiva') }}</flux:heading>
+            </div>
+
+            <div class="px-5 space-y-5">
+                <div class="grid gap-4 md:grid-cols-[1fr_1fr_360px]">
+                    <flux:input type="date" wire:model.live="massive_start_date" label="Fecha de inicio: *" />
+                    <flux:input type="date" wire:model.live="massive_end_date" label="Fecha de fin: *" />
+                    <div class="flex items-end">
+                        <flux:button type="button" wire:click="validateMassiveAvailability" icon="check-circle" class="w-full border border-[#22c55e] bg-white text-[#22c55e] hover:bg-[#ecfdf5]">
+                            {{ __('Validar Disponibilidad') }}
+                        </flux:button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mb-2 text-sm font-bold">{{ __('Filtrar por Turno:') }}</div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" wire:click="setMassiveShiftFilter('')" class="rounded-md border border-[#0ea5e9] px-3 py-2 text-sm font-semibold {{ $massive_shift_filter === '' ? 'bg-[#0ea5e9] text-white' : 'bg-white text-[#0ea5e9]' }}">
+                            {{ __('Todos los Turnos') }}
+                        </button>
+                        @foreach ($this->shifts as $shift)
+                            <button type="button" wire:click="setMassiveShiftFilter('{{ $shift->id }}')" class="rounded-md border border-[#0ea5e9] px-3 py-2 text-sm font-semibold {{ (string) $massive_shift_filter === (string) $shift->id ? 'bg-[#0ea5e9] text-white' : 'bg-white text-[#0ea5e9]' }}">
+                                {{ $shift->name }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mb-2 text-sm font-bold">{{ __('Dias Feriados en el Rango Seleccionado:') }}</div>
+                    <div class="rounded-md border border-gray-300 bg-gray-100 p-4">
+                        <div class="rounded bg-white px-3 py-2 text-sm font-bold text-[#075985]">
+                            {{ __('Feriados encontrados:') }}
+                            <span class="ml-2 text-xs font-normal text-gray-500">{{ __('Seleccione los que NO desea programar') }}</span>
+                        </div>
+                        <div class="mt-3 min-h-20 rounded border border-gray-200 bg-white p-3 text-sm">
+                            @forelse ($this->massiveHolidays as $holiday)
+                                <label class="mb-2 flex items-center gap-2">
+                                    <input type="checkbox" value="{{ $holiday->date->format('Y-m-d') }}" wire:model.live="massiveExcludedHolidayDates" class="rounded border-gray-300 text-[#0ea5e9] focus:ring-[#0ea5e9]">
+                                    <span>{{ $holiday->date->format('d/m/Y') }} - {{ $holiday->name }}</span>
+                                </label>
+                            @empty
+                                <div class="text-gray-500">{{ __('Seleccione un rango de fechas para ver los feriados') }}</div>
+                            @endforelse
+                        </div>
+                        <div class="mt-2 text-xs font-semibold text-[#0ea5e9]">
+                            {{ __('Los feriados seleccionados NO seran programados, incluso si el grupo trabaja ese dia.') }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t pt-4">
+                    <h2 class="mb-4 text-lg font-bold">{{ __('Grupos de Trabajo') }}</h2>
+                    <div class="grid gap-4 xl:grid-cols-3">
+                        @forelse ($massiveGroups as $groupId => $group)
+                            @php
+                                $result = $massiveValidation[$groupId] ?? ['errors' => [], 'warnings' => [], 'role_errors' => [], 'role_warnings' => [], 'dates_count' => 0];
+                                $hasErrors = ! empty($result['errors']);
+                            @endphp
+                            <div class="rounded-md border {{ $hasErrors ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50' }} p-4">
+                                <div class="mb-3 flex items-start justify-between gap-3">
+                                    <div class="text-sm font-bold uppercase">{{ $group['name'] }}</div>
+                                    <button type="button" wire:click="removeMassiveGroup({{ $groupId }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-400 text-red-500 hover:bg-red-50" title="Quitar">
+                                        x
+                                    </button>
+                                </div>
+
+                                <div class="space-y-2 text-sm">
+                                    <div><span class="font-bold">Zona:</span> {{ $group['zone_name'] }}</div>
+                                    <div><span class="font-bold">Turno:</span> <span class="rounded bg-[#0ea5e9] px-2 py-1 text-xs font-bold text-white">{{ $group['shift_name'] }}</span></div>
+                                    <div><span class="font-bold">Dias:</span> {{ $this->workDaysLabel($group['work_days']) }}</div>
+                                    <div><span class="font-bold">Vehiculo:</span> <span class="rounded bg-[#0ea5e9] px-2 py-1 text-xs font-bold text-white">{{ $group['vehicle_label'] }}{{ $group['vehicle_capacity'] ? ' (Capacidad: '.$group['vehicle_capacity'].')' : '' }}</span></div>
+                                </div>
+
+                                <div class="mt-4 space-y-3">
+                                    @foreach (['driver_id' => 'Conductor', 'helper_one_id' => 'Ayudante 1', 'helper_two_id' => 'Ayudante 2'] as $field => $label)
+                                        <div>
+                                            <label class="mb-1 block text-sm font-bold">{{ $label }}:</label>
+                                            <select wire:model.live="massiveGroups.{{ $groupId }}.{{ $field }}" class="w-full rounded-md border-gray-300 text-sm {{ ! empty($result['role_errors'][$field] ?? []) ? 'border-red-400 bg-red-100' : '' }}">
+                                                <option value="">{{ __('Seleccione') }}</option>
+                                                @foreach ($this->employees as $employee)
+                                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                                @endforeach
+                                            </select>
+                                            @if (! empty($result['role_errors'][$field] ?? []))
+                                                <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
+                                                    {{ collect($result['role_errors'][$field])->first() }}
+                                                </div>
+                                            @else
+                                                <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
+                                                    {{ collect($result['role_warnings'][$field] ?? ['Seleccione fechas para validar'])->first() }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <div class="rounded-md border border-gray-200 p-8 text-center text-sm text-gray-500 xl:col-span-3">
+                                {{ __('No hay grupos activos para el filtro seleccionado.') }}
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                @if ($massiveValidated)
+                    <div class="space-y-3 pt-2">
+                        <h3 class="text-base font-bold text-[#E53935]">{{ __('Resultado de Validacion General') }}</h3>
+                        @foreach ($massiveValidation as $groupId => $result)
+                            @php
+                                $group = $massiveGroups[$groupId] ?? null;
+                            @endphp
+                            @if ($group)
+                                <div class="overflow-hidden rounded-md border border-[#bfdbfe]">
+                                    <div class="flex items-center justify-between bg-[#e0f2fe] px-4 py-3 text-sm font-semibold">
+                                        <span>{{ $group['name'] }} - {{ $group['zone_name'] }} - {{ $group['shift_name'] }}</span>
+                                        <span class="flex gap-2">
+                                            @if (! empty($result['errors']))
+                                                <span class="rounded bg-[#E53935] px-2 py-1 text-xs text-white">{{ __('Con Errores') }}</span>
+                                            @endif
+                                            @if (! empty($result['warnings']))
+                                                <span class="rounded bg-[#facc15] px-2 py-1 text-xs text-[#333333]">{{ __('Con Advertencias') }}</span>
+                                            @endif
+                                        </span>
+                                    </div>
+                                    <div class="{{ ! empty($result['errors']) ? 'bg-red-100 text-red-600' : 'bg-green-50 text-green-700' }} px-5 py-4 text-sm font-semibold">
+                                        @if (! empty($result['warnings']))
+                                            <div class="mb-2 text-[#0ea5e9]">
+                                                {{ implode(' ', $result['warnings']) }}
+                                            </div>
+                                        @endif
+                                        @if (! empty($result['errors']))
+                                            <div class="mb-1 font-bold">{{ __('Errores:') }}</div>
+                                            <ul class="list-disc pl-5">
+                                                @foreach ($result['errors'] as $error)
+                                                    <li>{{ $error }}</li>
+                                                @endforeach
+                                            </ul>
+                                        @else
+                                            {{ __('Sin errores. Se programaran :count dia(s).', ['count' => $result['dates_count']]) }}
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            <div class="flex justify-center gap-3 border-t border-gray-200 px-5 py-4">
+                <flux:button type="button" variant="danger" wire:click="closeMassiveModal" class="bg-[#E53935] text-white hover:bg-[#C62828]">
+                    {{ __('Cancelar') }}
+                </flux:button>
+                <flux:button type="button" wire:click="saveMassiveScheduling" icon="calendar-days" class="bg-[#60a5fa] text-white hover:bg-[#3b82f6]">
+                    {{ __('Guardar') }}
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <flux:modal name="reprogramming-form" wire:close="closeReprogrammingModal" class="w-[96vw]! md:w-[1180px]! max-w-none! max-h-[92vh] overflow-y-auto">
+        <div class="space-y-5">
+            <div class="bg-[#075985] px-6 py-4 text-white">
+                <div class="flex items-center justify-between">
+                    <flux:heading size="lg" class="text-white">{{ __('Modificar Programacion') }}</flux:heading>
+                </div>
+            </div>
+
+            @php
+                $reasonOptions = [
+                    'Imprevistos',
+                    'Falta de disponibilidad',
+                    'Mantenimiento',
+                    'Solicitud operativa',
+                    'Reasignacion de personal',
+                ];
+            @endphp
+
+            <div class="grid gap-4 px-5 md:grid-cols-3">
+                <div class="rounded-md border border-gray-200 bg-white shadow-sm">
+                    <div class="rounded-t-md bg-[#0ea5e9] px-4 py-3 text-sm font-bold text-white">
+                        {{ __('Cambio de turno') }}
+                    </div>
+                    <div class="space-y-3 p-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold">{{ __('Turno actual') }}</label>
+                            <div class="rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
+                                {{ $this->shiftLabel($shift_id) }}
+                            </div>
+                        </div>
+                        <flux:select wire:model="change_shift_id" label="Nuevo Turno">
+                            <option value="">{{ __('Seleccione un nuevo turno') }}</option>
+                            @foreach ($this->shifts as $shift)
+                                <option value="{{ $shift->id }}">{{ $shift->name }} ({{ substr($shift->hour_in, 0, 5) }} - {{ substr($shift->hour_out, 0, 5) }})</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:select wire:model.live="change_turn_reason_preset" label="Motivo predefinido">
+                            <option value="">{{ __('Seleccione un motivo') }}</option>
+                            @foreach ($reasonOptions as $reason)
+                                <option value="{{ $reason }}">{{ $reason }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:textarea wire:model="change_turn_reason" label="Motivo del cambio" rows="2" placeholder="Ingrese el motivo del cambio de turno" />
+                        <flux:button type="button" wire:click="addTurnChange" icon="plus" class="bg-[#0ea5e9] text-white hover:bg-[#0284c7]">
+                            {{ __('Agregar cambio') }}
+                        </flux:button>
+                        @if ($turnChangeFeedback)
+                            <div class="rounded-md px-4 py-3 text-sm font-bold {{ $turnChangeFeedbackType === 'success' ? 'bg-[#28a745] text-white' : 'bg-[#E53935] text-white' }}">
+                                {{ $turnChangeFeedback }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="rounded-md border border-gray-200 bg-white shadow-sm">
+                    <div class="rounded-t-md bg-[#facc15] px-4 py-3 text-sm font-bold text-[#333333]">
+                        {{ __('Cambio de Vehiculo') }}
+                    </div>
+                    <div class="space-y-3 p-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold">{{ __('Vehiculo actual') }}</label>
+                            <div class="rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-700">
+                                {{ $this->vehicleLabel($vehicle_id) }}
+                            </div>
+                        </div>
+                        <flux:select wire:model="change_vehicle_id" label="Nuevo vehiculo">
+                            <option value="">{{ __('Seleccione un nuevo vehiculo') }}</option>
+                            @foreach ($this->vehicles as $vehicle)
+                                <option value="{{ $vehicle->id }}">{{ $vehicle->name }} - {{ $vehicle->plate }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:select wire:model.live="change_vehicle_reason_preset" label="Motivo predefinido">
+                            <option value="">{{ __('Seleccione un motivo') }}</option>
+                            @foreach ($reasonOptions as $reason)
+                                <option value="{{ $reason }}">{{ $reason }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:textarea wire:model="change_vehicle_reason" label="Motivo del cambio" rows="2" placeholder="Ingrese el motivo del cambio de vehiculo" />
+                        <flux:button type="button" wire:click="addVehicleChange" icon="plus" class="bg-[#0ea5e9] text-white hover:bg-[#0284c7]">
+                            {{ __('Agregar cambio') }}
+                        </flux:button>
+                        @if ($vehicleChangeFeedback)
+                            <div class="rounded-md px-4 py-3 text-sm font-bold {{ $vehicleChangeFeedbackType === 'success' ? 'bg-[#28a745] text-white' : 'bg-[#E53935] text-white' }}">
+                                {{ $vehicleChangeFeedback }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="rounded-md border border-gray-200 bg-white shadow-sm">
+                    <div class="rounded-t-md bg-[#22c55e] px-4 py-3 text-sm font-bold text-white">
+                        {{ __('Cambio de Personal') }}
+                    </div>
+                    <div class="space-y-3 p-4">
+                        <flux:select wire:model.live="change_person_role" label="Personal actual">
+                            <option value="">{{ __('Seleccione un personal') }}</option>
+                            <option value="driver_id">{{ __('Conductor') }} - {{ $this->employeeName(App\Models\Employee::find($driver_id)) }}</option>
+                            <option value="helper_one_id">{{ __('Ayudante 1') }} - {{ $this->employeeName(App\Models\Employee::find($helper_one_id)) }}</option>
+                            <option value="helper_two_id">{{ __('Ayudante 2') }} - {{ $this->employeeName(App\Models\Employee::find($helper_two_id)) }}</option>
+                        </flux:select>
+                        <flux:select wire:model="change_person_id" label="Nuevo personal">
+                            <option value="">{{ __('Buscar empleado disponible...') }}</option>
+                            @foreach ($this->employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:select wire:model.live="change_person_reason_preset" label="Motivo predefinido">
+                            <option value="">{{ __('Seleccione un motivo') }}</option>
+                            @foreach ($reasonOptions as $reason)
+                                <option value="{{ $reason }}">{{ $reason }}</option>
+                            @endforeach
+                        </flux:select>
+                        <flux:textarea wire:model="change_person_reason" label="Motivo del cambio" rows="2" placeholder="Ingrese el motivo del cambio de personal" />
+                        <flux:button type="button" wire:click="addPersonChange" icon="plus" class="bg-[#0ea5e9] text-white hover:bg-[#0284c7]">
+                            {{ __('Agregar cambio') }}
+                        </flux:button>
+                        @if ($personChangeFeedback)
+                            <div class="rounded-md px-4 py-3 text-sm font-bold {{ $personChangeFeedbackType === 'success' ? 'bg-[#28a745] text-white' : 'bg-[#E53935] text-white' }}">
+                                {{ $personChangeFeedback }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            @if (! empty($availabilityErrors))
+                <div class="mx-5 rounded-md bg-[#E53935] px-5 py-4 text-sm font-semibold leading-relaxed text-white">
+                    <div class="mb-2 font-bold">{{ __('Hay errores que corregir') }}</div>
+                    <ul class="list-disc pl-5">
+                        @foreach ($availabilityErrors as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <div class="mx-5 overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                <div class="bg-[#0ea5e9] px-4 py-3 text-sm font-bold text-white">
+                    {{ __('Cambios Registrados') }}
+                </div>
+                <div class="overflow-x-auto p-4">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left text-xs font-bold uppercase text-gray-600">
+                                <th class="border px-3 py-3">{{ __('Tipo de cambio') }}</th>
+                                <th class="border px-3 py-3">{{ __('Valor anterior') }}</th>
+                                <th class="border px-3 py-3">{{ __('Valor nuevo') }}</th>
+                                <th class="border px-3 py-3">{{ __('Motivo') }}</th>
+                                <th class="border px-3 py-3 text-center">{{ __('Accion') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($registeredChanges as $index => $change)
+                                <tr>
+                                    <td class="border px-3 py-3 font-semibold">{{ $change['label'] }}</td>
+                                    <td class="border px-3 py-3">{{ $change['old_value'] }}</td>
+                                    <td class="border px-3 py-3">{{ $change['new_value'] }}</td>
+                                    <td class="border px-3 py-3">{{ $change['reason'] }}</td>
+                                    <td class="border px-3 py-3 text-center">
+                                        <button type="button" wire:click="removeRegisteredChange({{ $index }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-[#E53935] text-white hover:bg-[#C62828]" title="Quitar">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12"/></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="border px-6 py-10 text-center text-sm text-gray-500">
+                                        {{ __('No hay cambios registrados. Agregue cambios usando los botones superiores.') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 border-t border-gray-200 px-5 py-4">
+                <flux:button type="button" variant="danger" wire:click="closeReprogrammingModal" class="bg-[#E53935] text-white hover:bg-[#C62828]">
+                    {{ __('Cancelar') }}
+                </flux:button>
+                <flux:button type="button" wire:click="applyReprogramming" variant="primary" class="bg-[#0ea5e9] text-white hover:bg-[#0284c7]">
+                    {{ __('Guardar') }}
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
     <flux:modal name="confirm-delete" class="md:w-100">
         <div class="space-y-5">
             <flux:heading size="lg" class="text-[#E53935]">{{ __('Confirmar eliminacion') }}</flux:heading>
@@ -1039,27 +2276,91 @@ new class extends Component
         </div>
     </flux:modal>
 
-    <flux:modal name="history-modal" class="md:w-[640px]">
-        <div class="space-y-4">
-            <flux:heading size="lg">{{ __('Historial de cambios') }}</flux:heading>
-            <div class="max-h-96 space-y-3 overflow-y-auto">
-                @forelse ($this->histories as $history)
-                    <div class="rounded-lg border border-gray-200 p-3 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="font-bold text-[#2E8B57]">{{ $history->action }}</span>
-                            <span class="text-xs text-gray-500">{{ $history->created_at?->format('d/m/Y H:i') }}</span>
-                        </div>
-                        <p class="mt-1 text-gray-700">{{ $history->description }}</p>
-                        <p class="mt-1 text-xs text-gray-500">{{ $history->user?->name ?? 'Sistema' }}</p>
-                    </div>
-                @empty
-                    <div class="rounded-lg border border-gray-200 p-6 text-center text-sm text-gray-500">
-                        {{ __('Sin cambios registrados.') }}
-                    </div>
-                @endforelse
+    <flux:modal name="history-modal" class="w-[94vw]! md:w-[960px]! max-w-none! max-h-[92vh] overflow-y-auto">
+        <div class="space-y-5">
+            <div class="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                <div class="bg-[#22c55e] px-5 py-4 text-sm font-bold text-white">
+                    {{ __('Personal Asignado') }}
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left text-xs font-bold uppercase text-gray-600">
+                                <th class="px-5 py-4">{{ __('Rol') }}</th>
+                                <th class="px-5 py-4">{{ __('Nombre') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @php
+                                $historyEmployees = $this->historyScheduling?->groupDetails->pluck('employee')->filter()->values() ?? collect();
+                            @endphp
+                            @foreach ([0 => 'Conductor', 1 => 'Ayudante', 2 => 'Ayudante'] as $index => $role)
+                                @php
+                                    $employee = $historyEmployees->get($index);
+                                @endphp
+                                <tr class="border-t">
+                                    <td class="px-5 py-4">
+                                        <span class="inline-flex rounded-md px-3 py-2 text-xs font-bold text-white {{ $role === 'Conductor' ? 'bg-[#0ea5e9]' : 'bg-[#22c55e]' }}">
+                                            {{ $role }}
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-4 font-semibold">
+                                        {{ $employee ? $this->employeeName($employee) : '-' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="flex justify-end">
-                <flux:button x-on:click="Flux.modal('history-modal').close()" type="button">{{ __('Cerrar') }}</flux:button>
+
+            <div class="overflow-hidden rounded-md border border-gray-200 bg-white shadow-sm">
+                <div class="bg-[#0ea5e9] px-5 py-4 text-sm font-bold text-white">
+                    {{ __('Historial de Cambios') }}
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="bg-gray-50 text-left text-xs font-bold uppercase text-gray-600">
+                                <th class="px-5 py-4">{{ __('Fecha') }}</th>
+                                <th class="px-5 py-4">{{ __('Tipo') }}</th>
+                                <th class="px-5 py-4">{{ __('Anterior') }}</th>
+                                <th class="px-5 py-4">{{ __('Nuevo') }}</th>
+                                <th class="px-5 py-4">{{ __('Motivo') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($this->histories as $history)
+                                <tr class="border-t align-top">
+                                    <td class="px-5 py-5 font-semibold text-[#075985]">
+                                        <div>{{ $this->historyDate($history) }}</div>
+                                        <div class="text-xs font-normal text-gray-500">{{ $this->historyTime($history) }}</div>
+                                    </td>
+                                    <td class="px-5 py-5">
+                                        <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $this->historyTypeClass($history) }}">
+                                            {{ $this->historyTypeLabel($history) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-5 py-5">{{ $this->historyBefore($history) }}</td>
+                                    <td class="px-5 py-5">{{ $this->historyAfter($history) }}</td>
+                                    <td class="px-5 py-5 text-[#1f4e79]">{{ $history->description }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
+                                        {{ __('Sin cambios registrados.') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-center">
+                <flux:button x-on:click="Flux.modal('history-modal').close()" type="button" variant="danger" class="bg-[#E53935] text-white hover:bg-[#C62828]">
+                    {{ __('Cerrar') }}
+                </flux:button>
             </div>
         </div>
     </flux:modal>
