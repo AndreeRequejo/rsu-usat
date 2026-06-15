@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Employee;
+use App\Models\EmployeeType;
 use App\Models\GroupDetail;
 use App\Models\Holiday;
 use App\Models\Scheduling;
@@ -53,9 +54,7 @@ new class extends Component
 
     public ?int $driver_id = null;
 
-    public ?int $helper_one_id = null;
-
-    public ?int $helper_two_id = null;
+    public array $helper_ids = [];
 
     public array $work_days = [];
 
@@ -147,8 +146,20 @@ new class extends Component
             'shift_id' => ['required', 'exists:shifts,id'],
             'vehicle_id' => ['required', 'exists:vehicles,id'],
             'driver_id' => ['required', 'exists:employees,id'],
-            'helper_one_id' => ['nullable', 'exists:employees,id', 'different:driver_id'],
-            'helper_two_id' => ['nullable', 'exists:employees,id', 'different:driver_id', 'different:helper_one_id'],
+            'helper_ids' => ['nullable', 'array'],
+            'helper_ids.*' => [
+                'nullable', 'integer', 'exists:employees,id',
+                function ($attribute, $value, $fail) {
+                    if (!$value) return;
+                    if ((int) $value === (int) $this->driver_id) {
+                        $fail('Un ayudante no puede ser el conductor.');
+                    }
+                    $count = collect($this->helper_ids)->filter(fn ($id) => (int) $id === (int) $value)->count();
+                    if ($count > 1) {
+                        $fail('Un empleado no puede ocupar mas de un puesto de ayudante.');
+                    }
+                },
+            ],
             'work_days' => ['required', 'array', 'min:1'],
             'notes' => ['nullable', 'string'],
             'change_reason' => [$this->editingId ? 'required' : 'nullable', 'string'],
@@ -167,8 +178,6 @@ new class extends Component
             'shift_id.required' => 'Seleccione un turno.',
             'vehicle_id.required' => 'Seleccione un vehiculo.',
             'driver_id.required' => 'Seleccione un conductor.',
-            'helper_one_id.different' => 'El ayudante 1 no puede ser el conductor.',
-            'helper_two_id.different' => 'El ayudante 2 no puede repetir conductor ni ayudante 1.',
             'work_days.required' => 'Seleccione al menos un dia de trabajo.',
             'work_days.min' => 'Seleccione al menos un dia de trabajo.',
             'change_reason.required' => 'Ingrese el motivo del cambio.',
@@ -205,10 +214,9 @@ new class extends Component
             'shift_id',
             'vehicle_id',
             'driver_id',
-            'helper_one_id',
-            'helper_two_id',
+            'helper_ids',
             'work_days',
-        ], true)) {
+        ], true) || str_starts_with($property, 'helper_ids.')) {
             $this->markAvailabilityDirty();
         }
     }
@@ -223,6 +231,12 @@ new class extends Component
             $this->syncSingleDayWorkDay();
         }
 
+        $this->markAvailabilityDirty();
+    }
+
+    public function updatedVehicleId(): void
+    {
+        $this->fillHelperSlots();
         $this->markAvailabilityDirty();
     }
 
@@ -312,8 +326,8 @@ new class extends Component
         $this->shift_id = $scheduling->shift_id;
         $this->vehicle_id = $scheduling->vehicle_id;
         $this->driver_id = $employees->get(0);
-        $this->helper_one_id = $employees->get(1);
-        $this->helper_two_id = $employees->get(2);
+        $this->helper_ids = $employees->slice(1)->values()->toArray();
+        $this->fillHelperSlots();
         $this->staff_group_id = $this->matchingStaffGroupId();
         $this->work_days = [$scheduling->date->dayOfWeekIso];
         $this->notes = $scheduling->notes ?? '';
@@ -511,8 +525,8 @@ new class extends Component
         $currentPersonId = $this->personIdForRole($this->change_person_role);
 
         $this->validate([
-            'change_person_role' => ['required', 'in:driver_id,helper_one_id,helper_two_id'],
-            'change_person_id' => ['required', 'exists:employees,id', 'different:'.$this->change_person_role],
+            'change_person_role' => ['required', 'string'],
+            'change_person_id' => ['required', 'exists:employees,id'],
             'change_person_reason' => ['required', 'string'],
         ], [
             'change_person_role.required' => 'Seleccione el personal actual.',
@@ -520,17 +534,30 @@ new class extends Component
             'change_person_reason.required' => 'Ingrese el motivo del cambio de personal.',
         ]);
 
-        if ((int) $currentPersonId === (int) $this->change_person_id) {
-            $this->addError('change_person_id', 'Seleccione un trabajador diferente al actual.');
-
+        if (! $this->validPersonRole($this->change_person_role)) {
+            $this->addError('change_person_role', 'Rol de personal invalido.');
             return;
         }
 
-        $errors = $this->validateReprogrammingState($this->reprogrammingState([$this->change_person_role => $this->change_person_id]));
+        if ((int) $currentPersonId === (int) $this->change_person_id) {
+            $this->addError('change_person_id', 'Seleccione un trabajador diferente al actual.');
+            return;
+        }
+
+        $overrides = [];
+        if ($this->change_person_role === 'driver_id') {
+            $overrides = ['driver_id' => (int) $this->change_person_id];
+        } elseif (str_starts_with($this->change_person_role, 'helper_ids.')) {
+            $index = (int) str_replace('helper_ids.', '', $this->change_person_role);
+            $tempHelperIds = $this->helper_ids;
+            $tempHelperIds[$index] = (int) $this->change_person_id;
+            $overrides = ['helper_ids' => $tempHelperIds];
+        }
+
+        $errors = $this->validateReprogrammingState($this->reprogrammingState($overrides));
         if (! empty($errors)) {
             $this->personChangeFeedback = implode(' ', $errors);
             $this->personChangeFeedbackType = 'error';
-
             return;
         }
 
@@ -587,8 +614,13 @@ new class extends Component
                 $this->vehicle_id = (int) $change['new_id'];
             }
 
-            if (in_array($change['field'], ['driver_id', 'helper_one_id', 'helper_two_id'], true)) {
-                $this->{$change['field']} = (int) $change['new_id'];
+            if ($change['field'] === 'driver_id') {
+                $this->driver_id = (int) $change['new_id'];
+            }
+
+            if (str_starts_with($change['field'], 'helper_ids.')) {
+                $index = (int) str_replace('helper_ids.', '', $change['field']);
+                $this->helper_ids[$index] = (int) $change['new_id'];
             }
         }
 
@@ -793,6 +825,39 @@ new class extends Component
     }
 
     #[Computed]
+    public function maxHelpers(): int
+    {
+        if (!$this->vehicle_id) return 0;
+        $vehicle = Vehicle::find($this->vehicle_id);
+        if (!$vehicle || !$vehicle->occupant_capacity) return 0;
+        return max(0, $vehicle->occupant_capacity - 1);
+    }
+
+    #[Computed]
+    public function drivers()
+    {
+        $driverType = EmployeeType::where('name', 'Conductor')->first();
+        if (!$driverType) return collect();
+        return Employee::where('employee_type_id', $driverType->id)
+            ->where('active', true)
+            ->whereHas('contracts', fn ($q) => $q->where('is_active', true))
+            ->orderBy('first_name')
+            ->get();
+    }
+
+    #[Computed]
+    public function helpersList()
+    {
+        $helperType = EmployeeType::where('name', 'Ayudante')->first();
+        if (!$helperType) return collect();
+        return Employee::where('employee_type_id', $helperType->id)
+            ->where('active', true)
+            ->whereHas('contracts', fn ($q) => $q->where('is_active', true))
+            ->orderBy('first_name')
+            ->get();
+    }
+
+    #[Computed]
     public function histories()
     {
         if (! $this->historyId) {
@@ -829,6 +894,16 @@ new class extends Component
             ->get();
     }
 
+    private function fillHelperSlots(): void
+    {
+        $max = $this->maxHelpers;
+        $this->helper_ids = array_pad(
+            array_slice($this->helper_ids, 0, $max),
+            $max,
+            null
+        );
+    }
+
     private function markAvailabilityDirty(): void
     {
         if ($this->availabilityChecked) {
@@ -863,7 +938,7 @@ new class extends Component
 
     private function selectedEmployeeIds(): array
     {
-        return collect([$this->driver_id, $this->helper_one_id, $this->helper_two_id])
+        return collect(array_merge([$this->driver_id], $this->helper_ids))
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->unique()
@@ -882,14 +957,16 @@ new class extends Component
 
     private function matchingStaffGroupId(): ?int
     {
+        $helperIds = array_values(array_filter($this->helper_ids));
+
         return StaffGroup::query()
             ->where('zone_id', $this->zone_id)
             ->where('shift_id', $this->shift_id)
             ->where('vehicle_id', $this->vehicle_id)
             ->where('driver_id', $this->driver_id)
-            ->where('helper_one_id', $this->helper_one_id)
-            ->where('helper_two_id', $this->helper_two_id)
-            ->value('id');
+            ->get()
+            ->first(fn (StaffGroup $group) => $group->helpers->pluck('id')->values()->toArray() === $helperIds)
+            ?->id;
     }
 
     private function syncStaffGroupValues($staffGroupId): bool
@@ -907,8 +984,8 @@ new class extends Component
         $this->shift_id = $group->shift_id;
         $this->vehicle_id = $group->vehicle_id;
         $this->driver_id = $group->driver_id;
-        $this->helper_one_id = $group->helper_one_id;
-        $this->helper_two_id = $group->helper_two_id;
+        $this->helper_ids = $group->helpers->pluck('id')->toArray();
+        $this->fillHelperSlots();
         $this->work_days = $group->work_days ?? [];
 
         if ($this->editingId) {
@@ -957,7 +1034,7 @@ new class extends Component
 
     private function loadMassiveGroups(): void
     {
-        $this->massiveGroups = StaffGroup::with(['zone', 'shift', 'vehicle', 'driver', 'helperOne', 'helperTwo'])
+        $this->massiveGroups = StaffGroup::with(['zone', 'shift', 'vehicle', 'driver', 'helpers'])
             ->where('active', true)
             ->when($this->massive_shift_filter !== '', fn ($query) => $query->where('shift_id', $this->massive_shift_filter))
             ->orderBy('name')
@@ -975,8 +1052,7 @@ new class extends Component
                         'vehicle_label' => $this->vehicleLabel($group->vehicle_id),
                         'vehicle_capacity' => $group->vehicle?->occupant_capacity,
                         'driver_id' => $group->driver_id,
-                        'helper_one_id' => $group->helper_one_id,
-                        'helper_two_id' => $group->helper_two_id,
+                        'helpers' => $group->helpers->pluck('id')->toArray(),
                         'work_days' => $group->work_days ?? [],
                     ],
                 ];
@@ -1032,7 +1108,7 @@ new class extends Component
 
     private function massiveSelectedEmployeeIds(array $groupData): array
     {
-        return collect([$groupData['driver_id'], $groupData['helper_one_id'], $groupData['helper_two_id']])
+        return collect(array_merge([$groupData['driver_id']], $groupData['helpers'] ?? []))
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->values()
@@ -1065,8 +1141,11 @@ new class extends Component
             if (count($employeeIds) !== count(array_unique($employeeIds))) {
                 $errors[] = 'Personal duplicado dentro del grupo.';
                 $roleErrors['driver_id'][] = 'Duplicado en la misma programacion.';
-                $roleErrors['helper_one_id'][] = 'Duplicado en la misma programacion.';
-                $roleErrors['helper_two_id'][] = 'Duplicado en la misma programacion.';
+                foreach ($groupData['helpers'] ?? [] as $i => $helperId) {
+                    if ($helperId) {
+                        $roleErrors['helper_ids.'.$i][] = 'Duplicado en la misma programacion.';
+                    }
+                }
             }
 
             foreach ($dates as $date) {
@@ -1084,11 +1163,9 @@ new class extends Component
                     $warnings[] = 'Programaciones existentes: '.$date->format('d/m/Y').'.';
                 }
 
-                foreach (['driver_id' => 'Conductor', 'helper_one_id' => 'Ayudante 1', 'helper_two_id' => 'Ayudante 2'] as $field => $label) {
+                foreach (['driver_id' => 'Conductor'] as $field => $label) {
                     $employeeId = $groupData[$field] ?? null;
-                    if (! $employeeId) {
-                        continue;
-                    }
+                    if (! $employeeId) continue;
 
                     $employeeKey = $dateKey.'|'.$groupData['shift_id'].'|'.$employeeId;
                     $employee = Employee::find($employeeId);
@@ -1116,9 +1193,42 @@ new class extends Component
                         $roleErrors[$field][] = $message;
                     }
                 }
+
+                foreach ($groupData['helpers'] ?? [] as $i => $helperId) {
+                    if (! $helperId) continue;
+
+                    $field = 'helper_ids.'.$i;
+                    $label = 'Ayudante '.($i + 1);
+                    $employeeKey = $dateKey.'|'.$groupData['shift_id'].'|'.$helperId;
+                    $employee = Employee::find($helperId);
+
+                    if (isset($proposedEmployees[$employeeKey])) {
+                        $message = $label.' '.$this->employeeName($employee).': Duplicado en '.$date->format('d/m/Y').'.';
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+
+                    $proposedEmployees[$employeeKey] = true;
+
+                    if (GroupDetail::where('employee_id', $helperId)
+                        ->whereHas('scheduling', fn ($query) => $query->whereDate('date', $dateKey)->where('shift_id', $groupData['shift_id']))
+                        ->exists()) {
+                        $message = $label.' '.$this->employeeName($employee).': Ya programado en '.$date->format('d/m/Y').'.';
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+
+                    $personProblems = $this->employeeDateProblems($helperId, $date);
+                    foreach ($personProblems as $problem) {
+                        $message = $label.' '.$this->employeeName($employee).': '.$problem;
+                        $errors[] = $message;
+                        $roleErrors[$field][] = $message;
+                    }
+                }
             }
 
-            foreach (['driver_id', 'helper_one_id', 'helper_two_id'] as $field) {
+            $roleFields = array_merge(['driver_id'], array_map(fn ($i) => 'helper_ids.'.$i, array_keys($groupData['helpers'] ?? [])));
+            foreach ($roleFields as $field) {
                 if (empty($roleErrors[$field])) {
                     $roleWarnings[$field][] = $this->massiveValidated ? 'Disponible para el rango validado.' : 'Seleccione fechas para validar';
                 }
@@ -1201,12 +1311,16 @@ new class extends Component
             'shift_id' => $this->shift_id,
             'vehicle_id' => $this->vehicle_id,
             'driver_id' => $this->driver_id,
-            'helper_one_id' => $this->helper_one_id,
-            'helper_two_id' => $this->helper_two_id,
+            'helper_ids' => $this->helper_ids,
         ];
 
         foreach ($this->registeredChanges as $change) {
-            $state[$change['field']] = $change['new_id'];
+            if (in_array($change['field'], ['shift_id', 'vehicle_id', 'driver_id'], true)) {
+                $state[$change['field']] = (int) $change['new_id'];
+            } elseif (str_starts_with($change['field'], 'helper_ids.')) {
+                $index = (int) str_replace('helper_ids.', '', $change['field']);
+                $state['helper_ids'][$index] = (int) $change['new_id'];
+            }
         }
 
         return array_merge($state, $overrides);
@@ -1221,7 +1335,7 @@ new class extends Component
             return ['No hay fecha laborable para validar el cambio.'];
         }
 
-        $selectedEmployees = collect([$state['driver_id'], $state['helper_one_id'], $state['helper_two_id']])
+        $selectedEmployees = collect(array_merge([$state['driver_id']], $state['helper_ids'] ?? []))
             ->filter()
             ->map(fn ($id) => (int) $id)
             ->values();
@@ -1288,22 +1402,32 @@ new class extends Component
 
     private function personIdForRole(string $role): ?int
     {
-        return match ($role) {
-            'driver_id' => $this->driver_id,
-            'helper_one_id' => $this->helper_one_id,
-            'helper_two_id' => $this->helper_two_id,
-            default => null,
-        };
+        if ($role === 'driver_id') return $this->driver_id;
+        if (str_starts_with($role, 'helper_ids.')) {
+            $index = (int) str_replace('helper_ids.', '', $role);
+            return $this->helper_ids[$index] ?? null;
+        }
+        return null;
+    }
+
+    private function validPersonRole(string $role): bool
+    {
+        if ($role === 'driver_id') return true;
+        if (str_starts_with($role, 'helper_ids.')) {
+            $index = (int) str_replace('helper_ids.', '', $role);
+            return $index >= 0 && $index < $this->maxHelpers;
+        }
+        return false;
     }
 
     public function roleLabel(string $role): string
     {
-        return match ($role) {
-            'driver_id' => 'Conductor',
-            'helper_one_id' => 'Ayudante 1',
-            'helper_two_id' => 'Ayudante 2',
-            default => 'Personal',
-        };
+        if ($role === 'driver_id') return 'Conductor';
+        if (str_starts_with($role, 'helper_ids.')) {
+            $index = (int) str_replace('helper_ids.', '', $role) + 1;
+            return 'Ayudante '.$index;
+        }
+        return 'Personal';
     }
 
     public function shiftLabel(?int $shiftId): string
@@ -1398,7 +1522,7 @@ new class extends Component
 
     private function validateDifferentPeople(): void
     {
-        $selected = array_filter([$this->driver_id, $this->helper_one_id, $this->helper_two_id]);
+        $selected = array_filter(array_merge([$this->driver_id], $this->helper_ids));
         if (count($selected) !== count(array_unique($selected))) {
             $this->availabilityErrors[] = 'Un trabajador no puede ocupar mas de un rol en la misma programacion.';
         }
@@ -1604,8 +1728,7 @@ new class extends Component
             'shift_id',
             'vehicle_id',
             'driver_id',
-            'helper_one_id',
-            'helper_two_id',
+            'helper_ids',
             'work_days',
             'notes',
             'change_reason',
@@ -1866,23 +1989,29 @@ new class extends Component
                 <div class="grid gap-4 md:grid-cols-3">
                     <flux:select wire:model.live="driver_id" label="Conductor *" :disabled="! filled($editingId)">
                         <option value="">{{ __('Seleccione') }}</option>
-                        @foreach ($this->employees as $employee)
-                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
-                        @endforeach
-                    </flux:select>
-                    <flux:select wire:model.live="helper_one_id" label="Ayudante 1" :disabled="filled($staff_group_id) && ! filled($editingId)">
-                        <option value="">{{ filled($staff_group_id) ? __('Vehiculo sin capacidad para un ayudante 1') : __('Seleccione') }}</option>
-                        @foreach ($this->employees as $employee)
-                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
-                        @endforeach
-                    </flux:select>
-                    <flux:select wire:model.live="helper_two_id" label="Ayudante 2" :disabled="filled($staff_group_id) && ! filled($editingId)">
-                        <option value="">{{ filled($staff_group_id) ? __('Vehiculo sin capacidad para un ayudante 2') : __('Seleccione') }}</option>
-                        @foreach ($this->employees as $employee)
+                        @foreach ($this->drivers as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                         @endforeach
                     </flux:select>
                 </div>
+
+                @php $maxHelpers = $this->maxHelpers; @endphp
+                @if ($maxHelpers > 0)
+                <div class="grid gap-4 md:grid-cols-{{ min($maxHelpers, 4) }}">
+                    @for ($i = 0; $i < $maxHelpers; $i++)
+                        <flux:select wire:model.live="helper_ids.{{ $i }}" label="{{ __('Ayudante :num', ['num' => $i + 1]) }}" :disabled="filled($staff_group_id) && ! filled($editingId)">
+                            <option value="">{{ __('Seleccione ayudante (opcional)') }}</option>
+                            @foreach ($this->helpersList as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                            @endforeach
+                        </flux:select>
+                    @endfor
+                </div>
+                @elseif ($vehicle_id)
+                    <div class="flex items-center justify-center p-4 text-sm text-gray-400 border border-dashed border-[#A5D6A7] rounded-lg">
+                        {{ __('El vehiculo no tiene capacidad para ayudantes') }}
+                    </div>
+                @endif
 
                 <div>
                     <label class="block text-sm font-semibold text-[#333333] mb-2">{{ __('Dias de trabajo *') }}</label>
@@ -1993,26 +2122,51 @@ new class extends Component
                                 </div>
 
                                 <div class="mt-4 space-y-3">
-                                    @foreach (['driver_id' => 'Conductor', 'helper_one_id' => 'Ayudante 1', 'helper_two_id' => 'Ayudante 2'] as $field => $label)
+                                    <div>
+                                        <label class="mb-1 block text-sm font-bold">Conductor:</label>
+                                        <select wire:model.live="massiveGroups.{{ $groupId }}.driver_id" class="w-full rounded-md border-gray-300 text-sm {{ ! empty($result['role_errors']['driver_id'] ?? []) ? 'border-red-400 bg-red-100' : '' }}">
+                                            <option value="">{{ __('Seleccione') }}</option>
+                                            @foreach ($this->drivers as $employee)
+                                                <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                            @endforeach
+                                        </select>
+                                        @if (! empty($result['role_errors']['driver_id'] ?? []))
+                                            <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
+                                                {{ collect($result['role_errors']['driver_id'])->first() }}
+                                            </div>
+                                        @else
+                                            <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
+                                                {{ collect($result['role_warnings']['driver_id'] ?? ['Seleccione fechas para validar'])->first() }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                    @php
+                                        $maxHelperSlots = $group['vehicle_capacity'] ? max(0, $group['vehicle_capacity'] - 1) : 0;
+                                        $helperCount = max(count($group['helpers'] ?? []), $maxHelperSlots);
+                                    @endphp
+                                    @for ($h = 0; $h < $helperCount; $h++)
+                                        @php
+                                            $helperField = 'helper_ids.'.$h;
+                                        @endphp
                                         <div>
-                                            <label class="mb-1 block text-sm font-bold">{{ $label }}:</label>
-                                            <select wire:model.live="massiveGroups.{{ $groupId }}.{{ $field }}" class="w-full rounded-md border-gray-300 text-sm {{ ! empty($result['role_errors'][$field] ?? []) ? 'border-red-400 bg-red-100' : '' }}">
+                                            <label class="mb-1 block text-sm font-bold">{{ __('Ayudante :num', ['num' => $h + 1]) }}:</label>
+                                            <select wire:model.live="massiveGroups.{{ $groupId }}.helpers.{{ $h }}" class="w-full rounded-md border-gray-300 text-sm {{ ! empty($result['role_errors'][$helperField] ?? []) ? 'border-red-400 bg-red-100' : '' }}">
                                                 <option value="">{{ __('Seleccione') }}</option>
-                                                @foreach ($this->employees as $employee)
+                            @foreach ($this->helpersList as $employee)
                                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                                 @endforeach
                                             </select>
-                                            @if (! empty($result['role_errors'][$field] ?? []))
+                                            @if (! empty($result['role_errors'][$helperField] ?? []))
                                                 <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
-                                                    {{ collect($result['role_errors'][$field])->first() }}
+                                                    {{ collect($result['role_errors'][$helperField])->first() }}
                                                 </div>
                                             @else
                                                 <div class="mt-1 rounded bg-cyan-100 px-2 py-2 text-xs font-semibold text-cyan-900">
-                                                    {{ collect($result['role_warnings'][$field] ?? ['Seleccione fechas para validar'])->first() }}
+                                                    {{ collect($result['role_warnings'][$helperField] ?? ['Seleccione fechas para validar'])->first() }}
                                                 </div>
                                             @endif
                                         </div>
-                                    @endforeach
+                                    @endfor
                                 </div>
                             </div>
                         @empty
@@ -2175,12 +2329,20 @@ new class extends Component
                         <flux:select wire:model.live="change_person_role" label="Personal actual">
                             <option value="">{{ __('Seleccione un personal') }}</option>
                             <option value="driver_id">{{ __('Conductor') }} - {{ $this->employeeName(App\Models\Employee::find($driver_id)) }}</option>
-                            <option value="helper_one_id">{{ __('Ayudante 1') }} - {{ $this->employeeName(App\Models\Employee::find($helper_one_id)) }}</option>
-                            <option value="helper_two_id">{{ __('Ayudante 2') }} - {{ $this->employeeName(App\Models\Employee::find($helper_two_id)) }}</option>
+                            @for ($h = 0; $h < $this->maxHelpers; $h++)
+                                @php
+                                    $helperPersonId = $this->helper_ids[$h] ?? null;
+                                    $helperPerson = $helperPersonId ? App\Models\Employee::find($helperPersonId) : null;
+                                @endphp
+                                <option value="helper_ids.{{ $h }}">{{ __('Ayudante :num', ['num' => $h + 1]) }} - {{ $helperPerson ? $this->employeeName($helperPerson) : __('Vacio') }}</option>
+                            @endfor
                         </flux:select>
                         <flux:select wire:model="change_person_id" label="Nuevo personal">
                             <option value="">{{ __('Buscar empleado disponible...') }}</option>
-                            @foreach ($this->employees as $employee)
+                            @php
+                                $personnelList = $change_person_role === 'driver_id' ? $this->drivers : $this->helpersList;
+                            @endphp
+                            @foreach ($personnelList as $employee)
                                 <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                             @endforeach
                         </flux:select>
@@ -2294,14 +2456,11 @@ new class extends Component
                             @php
                                 $historyEmployees = $this->historyScheduling?->groupDetails->pluck('employee')->filter()->values() ?? collect();
                             @endphp
-                            @foreach ([0 => 'Conductor', 1 => 'Ayudante', 2 => 'Ayudante'] as $index => $role)
-                                @php
-                                    $employee = $historyEmployees->get($index);
-                                @endphp
+                            @foreach ($historyEmployees as $index => $employee)
                                 <tr class="border-t">
                                     <td class="px-5 py-4">
-                                        <span class="inline-flex rounded-md px-3 py-2 text-xs font-bold text-white {{ $role === 'Conductor' ? 'bg-[#0ea5e9]' : 'bg-[#22c55e]' }}">
-                                            {{ $role }}
+                                        <span class="inline-flex rounded-md px-3 py-2 text-xs font-bold text-white {{ $index === 0 ? 'bg-[#0ea5e9]' : 'bg-[#22c55e]' }}">
+                                            {{ $index === 0 ? 'Conductor' : __('Ayudante :num', ['num' => $index]) }}
                                         </span>
                                     </td>
                                     <td class="px-5 py-4 font-semibold">

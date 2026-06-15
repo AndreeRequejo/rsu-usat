@@ -25,8 +25,7 @@ new class extends Component {
     public ?int $shift_id = null;
     public ?int $vehicle_id = null;
     public ?int $driver_id = null;
-    public ?int $helper_one_id = null;
-    public ?int $helper_two_id = null;
+    public array $helper_ids = [];
     public array $work_days = [];
     public bool $active = true;
 
@@ -45,22 +44,19 @@ new class extends Component {
             'shift_id' => ['required', 'integer', 'exists:shifts,id'],
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'driver_id' => ['required', 'integer', 'exists:employees,id'],
-            'helper_one_id' => [
+            'helper_ids' => ['nullable', 'array'],
+            'helper_ids.*' => [
                 'nullable', 'integer', 'exists:employees,id',
                 function ($attribute, $value, $fail) {
-                    if ($value && $value === $this->driver_id) {
-                        $fail(__('El ayudante 1 no puede ser el conductor.'));
+                    if (!$value) return;
+                    $parts = explode('.', $attribute);
+                    $index = (int) end($parts);
+                    if ($value === $this->driver_id) {
+                        $fail(__('El ayudante :index no puede ser el conductor.', ['index' => $index + 1]));
                     }
-                    if ($value && $value === $this->helper_two_id) {
-                        $fail(__('El ayudante 1 y ayudante 2 no pueden ser la misma persona.'));
-                    }
-                },
-            ],
-            'helper_two_id' => [
-                'nullable', 'integer', 'exists:employees,id',
-                function ($attribute, $value, $fail) {
-                    if ($value && $value === $this->driver_id) {
-                        $fail(__('El ayudante 2 no puede ser el conductor.'));
+                    $count = collect($this->helper_ids)->filter(fn ($id) => (int) $id === (int) $value)->count();
+                    if ($count > 1) {
+                        $fail(__('El ayudante :index ya esta seleccionado en otro puesto.', ['index' => $index + 1]));
                     }
                 },
             ],
@@ -84,8 +80,7 @@ new class extends Component {
             'vehicle_id.exists' => __('El vehiculo seleccionado no es valido.'),
             'driver_id.required' => __('El conductor es obligatorio.'),
             'driver_id.exists' => __('El conductor seleccionado no es valido.'),
-            'helper_one_id.exists' => __('El ayudante 1 seleccionado no es valido.'),
-            'helper_two_id.exists' => __('El ayudante 2 seleccionado no es valido.'),
+            'helper_ids.*.exists' => __('El ayudante seleccionado no es valido.'),
             'work_days.required' => __('Seleccione al menos un dia de trabajo.'),
             'work_days.min' => __('Seleccione al menos un dia de trabajo.'),
         ];
@@ -100,6 +95,7 @@ new class extends Component {
             $this->validateEmployeeOverlap(),
             $this->validateZoneOverlap(),
             $this->validateVehicleAvailability(),
+            $this->validateHelperCapacity(),
         );
 
         foreach ($errors as $field => $message) {
@@ -108,14 +104,16 @@ new class extends Component {
 
         if (!empty($errors)) return;
 
+        $helperIds = array_values(array_filter($this->helper_ids));
+
         $data = [
             'name' => $this->name,
             'zone_id' => $this->zone_id,
             'shift_id' => $this->shift_id,
             'vehicle_id' => $this->vehicle_id,
             'driver_id' => $this->driver_id,
-            'helper_one_id' => $this->helper_one_id,
-            'helper_two_id' => $this->helper_two_id,
+            'helper_one_id' => $helperIds[0] ?? null,
+            'helper_two_id' => $helperIds[1] ?? null,
             'work_days' => $this->work_days,
             'active' => $this->active,
         ];
@@ -123,9 +121,11 @@ new class extends Component {
         if ($this->editingId) {
             $group = StaffGroup::findOrFail($this->editingId);
             $group->update($data);
+            $group->syncPivotEmployees($this->driver_id, $helperIds);
             Flux::toast(variant: 'success', text: __('Grupo actualizado.'));
         } else {
-            StaffGroup::create($data);
+            $group = StaffGroup::create($data);
+            $group->syncPivotEmployees($this->driver_id, $helperIds);
             Flux::toast(variant: 'success', text: __('Grupo creado.'));
         }
 
@@ -137,7 +137,8 @@ new class extends Component {
     private function validateEmployeeContracts(): array
     {
         $errors = [];
-        $employeeIds = array_filter([$this->driver_id, $this->helper_one_id, $this->helper_two_id]);
+        $employeeIds = array_merge([$this->driver_id], array_filter($this->helper_ids));
+        $employeeIds = array_filter($employeeIds);
         if (empty($employeeIds)) return $errors;
 
         $employees = Employee::with('contracts')->whereIn('id', $employeeIds)->get();
@@ -147,11 +148,8 @@ new class extends Component {
                 ->first(fn ($c) => $c->isEffectivelyActive());
 
             if (!$hasActiveContract) {
-                $field = match ($employee->id) {
-                    $this->driver_id => 'driver_id',
-                    $this->helper_one_id => 'helper_one_id',
-                    $this->helper_two_id => 'helper_two_id',
-                };
+                $index = array_search($employee->id, $this->helper_ids);
+                $field = $index !== false ? 'helper_ids.'.$index : 'driver_id';
                 $errors[$field] = __('El empleado :name no tiene un contrato activo.', [
                     'name' => $employee->first_name.' '.$employee->last_name,
                 ]);
@@ -165,32 +163,33 @@ new class extends Component {
         $errors = [];
         if (!$this->shift_id || empty($this->work_days)) return $errors;
 
-        $selectedIds = array_filter([$this->driver_id, $this->helper_one_id, $this->helper_two_id]);
+        $selectedIds = array_merge([$this->driver_id], array_filter($this->helper_ids));
+        $selectedIds = array_filter($selectedIds);
         if (empty($selectedIds)) return $errors;
 
-        $overlapGroups = StaffGroup::where('shift_id', $this->shift_id)
+        $overlapGroupIds = StaffGroup::where('shift_id', $this->shift_id)
             ->when($this->editingId, fn ($q) => $q->where('id', '!=', $this->editingId))
-            ->get(['id', 'driver_id', 'helper_one_id', 'helper_two_id', 'work_days']);
+            ->pluck('id');
 
-        foreach ($overlapGroups as $group) {
+        $pivotEmployees = \Illuminate\Support\Facades\DB::table('staff_group_employee')
+            ->whereIn('staff_group_id', $overlapGroupIds)
+            ->whereIn('employee_id', $selectedIds)
+            ->get()
+            ->groupBy('staff_group_id');
+
+        foreach ($pivotEmployees as $staffGroupId => $employees) {
+            $group = StaffGroup::find($staffGroupId);
+            if (!$group) continue;
             $groupDays = is_array($group->work_days) ? $group->work_days : [];
             $dayOverlap = array_intersect($this->work_days, $groupDays);
             if (empty($dayOverlap)) continue;
 
-            $groupEmployeeIds = array_filter([
-                $group->driver_id, $group->helper_one_id, $group->helper_two_id,
-            ]);
-            $conflicts = array_intersect($groupEmployeeIds, $selectedIds);
-            if (empty($conflicts)) continue;
-
+            $conflicts = $employees->pluck('employee_id')->toArray();
             foreach ($conflicts as $employeeId) {
                 $employee = Employee::find($employeeId);
                 if (!$employee) continue;
-                $field = match ($employeeId) {
-                    $this->driver_id => 'driver_id',
-                    $this->helper_one_id => 'helper_one_id',
-                    $this->helper_two_id => 'helper_two_id',
-                };
+                $index = array_search($employeeId, $this->helper_ids);
+                $field = $index !== false ? 'helper_ids.'.$index : 'driver_id';
                 $errors[$field] = __('El empleado :name ya esta asignado a otro grupo en el mismo turno con dias que se cruzan.', [
                     'name' => $employee->first_name.' '.$employee->last_name,
                 ]);
@@ -249,9 +248,23 @@ new class extends Component {
         return $errors;
     }
 
+    private function validateHelperCapacity(): array
+    {
+        $errors = [];
+        $max = $this->maxHelpers;
+        $assigned = array_values(array_filter($this->helper_ids));
+        foreach ($assigned as $i => $id) {
+            if ($i >= $max) {
+                $errors['helper_ids.'.$i] = __('El vehiculo solo tiene capacidad para :count ayudante(s).', ['count' => $max]);
+            }
+        }
+        return $errors;
+    }
+
     public function openCreate(): void
     {
         $this->resetForm();
+        $this->fillHelperSlots();
         $this->showModal = true;
         Flux::modal('staff-group-form')->show();
     }
@@ -265,10 +278,10 @@ new class extends Component {
         $this->shift_id = $group->shift_id;
         $this->vehicle_id = $group->vehicle_id;
         $this->driver_id = $group->driver_id;
-        $this->helper_one_id = $group->helper_one_id;
-        $this->helper_two_id = $group->helper_two_id;
+        $this->helper_ids = $group->helpers->pluck('id')->toArray();
         $this->work_days = $group->work_days ?? [];
         $this->active = $group->active;
+        $this->fillHelperSlots();
         $this->showModal = true;
         Flux::modal('staff-group-form')->show();
     }
@@ -319,11 +332,11 @@ new class extends Component {
 
     private function activeSchedulingCount(StaffGroup $group): int
     {
-        $employeeIds = array_filter([
-            $group->driver_id,
-            $group->helper_one_id,
-            $group->helper_two_id,
-        ]);
+        $employeeIds = array_merge(
+            [$group->driver_id],
+            $group->helpers->pluck('id')->toArray(),
+        );
+        $employeeIds = array_filter($employeeIds);
         if (empty($employeeIds)) return 0;
 
         return Scheduling::whereDate('date', '>=', now())
@@ -338,7 +351,7 @@ new class extends Component {
     public function staffGroups()
     {
         return StaffGroup::query()
-            ->with(['zone', 'shift', 'vehicle', 'driver', 'helperOne', 'helperTwo'])
+            ->with(['zone', 'shift', 'vehicle', 'driver', 'helpers'])
             ->when($this->search !== '', function ($query) {
                 $query->where('name', 'like', '%'.$this->search.'%')
                     ->orWhereHas('zone', function ($q) {
@@ -398,18 +411,50 @@ new class extends Component {
             ->get();
     }
 
+    #[Computed]
+    public function selectedVehicle(): ?Vehicle
+    {
+        if (!$this->vehicle_id) return null;
+        return Vehicle::find($this->vehicle_id);
+    }
+
+    #[Computed]
+    public function maxHelpers(): int
+    {
+        $vehicle = $this->selectedVehicle;
+        if (!$vehicle || !$vehicle->occupant_capacity) return 0;
+        return max(0, $vehicle->occupant_capacity - 1);
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedVehicleId(): void
+    {
+        $max = $this->maxHelpers;
+        $this->helper_ids = array_pad(array_slice($this->helper_ids, 0, $max), $max, null);
+    }
+
+    private function fillHelperSlots(): void
+    {
+        $max = $this->maxHelpers;
+        $this->helper_ids = array_pad(
+            array_slice($this->helper_ids, 0, $max),
+            $max,
+            null
+        );
     }
 
     private function resetForm(): void
     {
         $this->reset([
             'name', 'zone_id', 'shift_id', 'vehicle_id',
-            'driver_id', 'helper_one_id', 'helper_two_id',
+            'driver_id',
             'work_days', 'editingId',
         ]);
+        $this->helper_ids = [];
         $this->active = true;
         $this->resetErrorBag();
         $this->resetValidation();
@@ -492,17 +537,11 @@ new class extends Component {
                                 <div>{{ $group->driver?->first_name ?? '' }} </div> <div> {{ $group->driver?->last_name ?? '---' }}</div>
                             </td>
                             <td class="px-4 py-4 space-y-1 text-sm text-[#333333]">
-                                @if($group->helperOne)
-                                    <div class="rounded bg-gray-100 px-2 py-1 text-xs" >{{ $group->helperOne->first_name }} {{ $group->helperOne->last_name }}</div>
-                                @endif
-
-                                @if($group->helperTwo)
-                                    <div class="rounded bg-gray-100 px-2 py-1 text-xs" >{{ $group->helperTwo->first_name }} {{ $group->helperTwo->last_name }}</div>
-                                @endif
-
-                                @unless($group->helperOne || $group->helperTwo)
+                                @forelse ($group->helpers as $helper)
+                                    <div class="rounded bg-gray-100 px-2 py-1 text-xs">{{ $helper->first_name }} {{ $helper->last_name }}</div>
+                                @empty
                                     ---
-                                @endunless
+                                @endforelse
                             </td>
                             <td class="px-4 py-4 text-center whitespace-nowrap">
                                 <div class="grid grid-cols-4 space-x-1 space-y-1 gap-0.5 justify-items-center">
@@ -595,12 +634,20 @@ new class extends Component {
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-                <flux:select wire:model="vehicle_id" :label="__('Vehiculo')" required>
+                <flux:select wire:model.live="vehicle_id" :label="__('Vehiculo')" required>
                     <option value="">{{ __('Seleccione un vehiculo') }}</option>
                     @foreach ($this->vehicles as $vehicle)
                         <option value="{{ $vehicle->id }}">{{ $vehicle->name }} - {{ $vehicle->plate }}</option>
                     @endforeach
                 </flux:select>
+                @if ($this->selectedVehicle?->occupant_capacity)
+                    <p class="mt-1 text-xs text-[#666666]">
+                        {{ __('Capacidad: :total ocupantes (conductor + :helpers ayudante(s))', [
+                            'total' => $this->selectedVehicle->occupant_capacity,
+                            'helpers' => $this->maxHelpers,
+                        ]) }}
+                    </p>
+                @endif
 
                 <div x-data="{
                     open: false,
@@ -653,11 +700,13 @@ new class extends Component {
                 </div>
             </div>
 
+            @php $max = $this->maxHelpers; @endphp
             <div class="grid gap-4 md:grid-cols-2">
+                @for ($i = 0; $i < $max; $i++)
                 <div x-data="{
                     open: false,
                     search: '',
-                    selectedId: @entangle('helper_one_id'),
+                    selectedId: @entangle('helper_ids.' . $i),
                     items: @js($this->helpers->map(fn ($e) => ['id' => $e->id, 'name' => $e->first_name.' '.$e->last_name, 'dni' => $e->dni])->values()),
                     placeholder: '{{ __('Seleccione un ayudante (opcional)') }}',
                     get selectedName() {
@@ -672,8 +721,8 @@ new class extends Component {
                     toggle() { this.open = !this.open; if (this.open) { this.$nextTick(() => this.$el.querySelector('input')?.focus()); } },
                     select(item) { this.selectedId = item.id; this.open = false; this.search = ''; },
                     close() { this.open = false; this.search = ''; },
-                }" class="relative">
-                    <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Ayudante 1') }}</label>
+                }" class="relative" wire:key="helper-{{ $i }}">
+                    <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Ayudante :num', ['num' => $i + 1]) }}</label>
                     <button type="button" @click="toggle()"
                         class="w-full flex items-center justify-between px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                         <span x-text="selectedName || placeholder" :class="{'text-gray-400': !selectedName}"></span>
@@ -701,58 +750,15 @@ new class extends Component {
                             </div>
                         </div>
                     </div>
-                    @error('helper_one_id') <span class="mt-1 block text-xs text-[#E53935]">{{ $message }}</span> @enderror
+                    @error('helper_ids.' . $i) <span class="mt-1 block text-xs text-[#E53935]">{{ $message }}</span> @enderror
                 </div>
+                @endfor
 
-                <div x-data="{
-                    open: false,
-                    search: '',
-                    selectedId: @entangle('helper_two_id'),
-                    items: @js($this->helpers->map(fn ($e) => ['id' => $e->id, 'name' => $e->first_name.' '.$e->last_name, 'dni' => $e->dni])->values()),
-                    placeholder: '{{ __('Seleccione un ayudante (opcional)') }}',
-                    get selectedName() {
-                        const item = this.items.find(i => i.id === this.selectedId);
-                        return item ? item.name : '';
-                    },
-                    get filtered() {
-                        if (!this.search) return this.items;
-                        const s = this.search.toLowerCase();
-                        return this.items.filter(i => i.name.toLowerCase().includes(s) || i.dni.includes(s));
-                    },
-                    toggle() { this.open = !this.open; if (this.open) { this.$nextTick(() => this.$el.querySelector('input')?.focus()); } },
-                    select(item) { this.selectedId = item.id; this.open = false; this.search = ''; },
-                    close() { this.open = false; this.search = ''; },
-                }" class="relative">
-                    <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Ayudante 2') }}</label>
-                    <button type="button" @click="toggle()"
-                        class="w-full flex items-center justify-between px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                        <span x-text="selectedName || placeholder" :class="{'text-gray-400': !selectedName}"></span>
-                        <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                    <div x-show="open" @click.outside="close()" x-cloak
-                        class="absolute z-50 mt-1 w-full bg-white border border-[#A5D6A7] rounded-lg shadow-lg">
-                        <div class="p-2">
-                            <input type="text" x-model="search" placeholder="{{ __('Buscar por nombre o DNI...') }}"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                        </div>
-                        <div class="max-h-48 overflow-y-auto">
-                            <template x-for="item in filtered" :key="item.id">
-                                <button type="button" @click="select(item)"
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-[#A5D6A7]/20 transition flex items-center justify-between"
-                                    :class="{'bg-[#A5D6A7]/30': item.id === selectedId}">
-                                    <span x-text="item.name" class="font-medium"></span>
-                                    <span x-text="item.dni" class="text-gray-500 text-xs ml-2"></span>
-                                </button>
-                            </template>
-                            <div x-show="filtered.length === 0" class="px-3 py-4 text-sm text-gray-500 text-center">
-                                {{ __('Sin resultados') }}
-                            </div>
-                        </div>
-                    </div>
-                    @error('helper_two_id') <span class="mt-1 block text-xs text-[#E53935]">{{ $message }}</span> @enderror
+                @if ($max === 0 && $this->vehicle_id)
+                <div class="flex items-center justify-center p-4 text-sm text-gray-400 border border-dashed border-[#A5D6A7] rounded-lg col-span-2">
+                    {{ __('El vehiculo no tiene capacidad para ayudantes') }}
                 </div>
+                @endif
             </div>
 
             <div>
