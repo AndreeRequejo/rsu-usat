@@ -1,0 +1,94 @@
+services:
+
+  # =============================================================
+  # 1. Aplicación Laravel (imagen desde Docker Hub)
+  # =============================================================
+  app:
+    image: ${APP_IMAGE:-tuusuario/rsu-usat-app:latest}
+    container_name: laravel_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+    volumes:
+      - app-storage:/var/www/storage
+      - app-cache:/var/www/bootstrap/cache
+    networks:
+      - laravel
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # =============================================================
+  # 2. Servidor Web (imagen desde Docker Hub)
+  # =============================================================
+  nginx:
+    image: ${NGINX_IMAGE:-tuusuario/rsu-usat-nginx:latest}
+    container_name: laravel_nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    networks:
+      - laravel
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # =============================================================
+  # 3. Base de Datos (MySQL 8.0)
+  # =============================================================
+  mysql:
+    image: mysql:8.0
+    container_name: laravel_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-laravel}
+      MYSQL_USER: ${DB_USERNAME:-laravel}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+    ports:
+      - "${DB_PORT_EXTERNAL:-33066}:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - laravel
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_ROOT_PASSWORD:-root_password}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+# =============================================================
+# Redes
+# =============================================================
+networks:
+  laravel:
+    driver: bridge
+    name: laravel-network
+
+# =============================================================
+# Volúmenes Persistentes
+# =============================================================
+volumes:
+  db-data:
+    driver: local
+    name: laravel-db-data
+  app-storage:
+    driver: local
+    name: laravel-storage
+  app-cache:
+    driver: local
+    name: laravel-cache
