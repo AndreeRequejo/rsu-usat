@@ -163,6 +163,12 @@
                     <span class="font-semibold text-gray-900">Grupos de personal</span>
                     <span class="text-sm text-gray-500">Organice los grupos de personal.</span>
                 </a>
+                <a href="{{ route('scheduling.changes.index') }}"
+                     class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
+                    <i class="fas fa-exchange-alt fa-2x text-green-600"></i>
+                    <span class="font-semibold text-gray-900">Cambios</span>
+                    <span class="text-sm text-gray-500">Gestione cambios masivos de programaciones.</span>
+                </a>
                 <a href="{{ route('scheduling.scheduling.index') }}"
                      class="bg-green-50 border border-green-200 rounded-xl p-5 hover:border-green-500 hover:shadow-md hover:-translate-y-0.5 transition flex flex-col gap-2">
                     <i class="fas fa-truck fa-2x text-green-600"></i>
