@@ -34,8 +34,8 @@ class Index extends Component
     public string $massive_end_date = '';
     public ?int $massive_zone_id = null;
     public string $massive_change_type = '';
-    public ?int $massive_old_resource_id = null;
-    public ?int $massive_new_resource_id = null;
+    public string $massive_old_resource_id = '';
+    public string $massive_new_resource_id = '';
     public string $massive_reason_preset = '';
     public string $massive_reason_detail = '';
     public string $massive_reason_full = '';
@@ -66,7 +66,9 @@ class Index extends Component
             'massive_end_date.after_or_equal' => 'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
             'massive_change_type.required' => 'Seleccione el tipo de cambio.',
             'massive_old_resource_id.required' => 'Seleccione el recurso a reemplazar.',
+            'massive_old_resource_id.integer' => 'Seleccione un recurso valido.',
             'massive_new_resource_id.required' => 'Seleccione el nuevo recurso.',
+            'massive_new_resource_id.integer' => 'Seleccione un recurso valido.',
             'massive_new_resource_id.different' => 'El nuevo recurso debe ser diferente al anterior.',
             'massive_reason_preset.required' => 'Seleccione un motivo predefinido.',
             'massive_reason_full.required' => 'La descripcion completa es obligatoria.',
@@ -75,8 +77,8 @@ class Index extends Component
 
     public function updatedMassiveChangeType(): void
     {
-        $this->massive_old_resource_id = null;
-        $this->massive_new_resource_id = null;
+        $this->massive_old_resource_id = '';
+        $this->massive_new_resource_id = '';
     }
 
     public function updatedMassiveReasonPreset(): void
@@ -117,17 +119,16 @@ class Index extends Component
 
     public function previewChanges(): void
     {
-        try {
-            $this->validate();
-            $this->previewChanges = $this->buildPreview();
-            $this->previewAffectedCount = count($this->previewChanges);
-            $this->showConfirmModal = true;
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Flux::toast(variant: 'warning', text: 'Por favor complete todos los campos requeridos.');
-            throw $e;
-        } catch (\Throwable $e) {
-            Flux::toast(variant: 'danger', text: 'Error al procesar: ' . $e->getMessage());
+        $this->validate();
+        $this->previewChanges = $this->buildPreview();
+        $this->previewAffectedCount = count($this->previewChanges);
+
+        if ($this->previewAffectedCount === 0) {
+            Flux::toast(variant: 'warning', text: 'No se encontraron programaciones que coincidan con los criterios seleccionados. Verifique que existan programaciones en el rango de fechas con el recurso seleccionado.');
+            return;
         }
+
+        $this->showConfirmModal = true;
     }
 
     public function cancelConfirm(): void
@@ -142,19 +143,22 @@ class Index extends Component
             return;
         }
 
-        DB::transaction(function () {
+        $oldId = (int) $this->massive_old_resource_id;
+        $newId = (int) $this->massive_new_resource_id;
+
+        DB::transaction(function () use ($oldId, $newId) {
             $change = SchedulingChange::create([
                 'user_id' => auth()->id(),
                 'change_type' => $this->massive_change_type,
                 'start_date' => $this->massive_start_date,
                 'end_date' => $this->massive_end_date,
                 'zone_id' => $this->massive_zone_id,
-                'old_shift_id' => $this->massive_change_type === 'turn' ? $this->massive_old_resource_id : null,
-                'new_shift_id' => $this->massive_change_type === 'turn' ? $this->massive_new_resource_id : null,
-                'old_vehicle_id' => $this->massive_change_type === 'vehicle' ? $this->massive_old_resource_id : null,
-                'new_vehicle_id' => $this->massive_change_type === 'vehicle' ? $this->massive_new_resource_id : null,
-                'old_person_id' => in_array($this->massive_change_type, ['driver', 'helper']) ? $this->massive_old_resource_id : null,
-                'new_person_id' => in_array($this->massive_change_type, ['driver', 'helper']) ? $this->massive_new_resource_id : null,
+                'old_shift_id' => $this->massive_change_type === 'turn' ? $oldId : null,
+                'new_shift_id' => $this->massive_change_type === 'turn' ? $newId : null,
+                'old_vehicle_id' => $this->massive_change_type === 'vehicle' ? $oldId : null,
+                'new_vehicle_id' => $this->massive_change_type === 'vehicle' ? $newId : null,
+                'old_person_id' => in_array($this->massive_change_type, ['driver', 'helper']) ? $oldId : null,
+                'new_person_id' => in_array($this->massive_change_type, ['driver', 'helper']) ? $newId : null,
                 'person_role' => in_array($this->massive_change_type, ['driver', 'helper']) ? $this->massive_change_type : null,
                 'reason_preset' => $this->massive_reason_preset,
                 'reason_detail' => $this->massive_reason_detail,
@@ -173,14 +177,14 @@ class Index extends Component
                 ];
 
                 if ($this->massive_change_type === 'turn') {
-                    $scheduling->update(['shift_id' => $this->massive_new_resource_id, 'status' => 'Reprogramado']);
+                    $scheduling->update(['shift_id' => $newId, 'status' => 'Reprogramado']);
                 } elseif ($this->massive_change_type === 'vehicle') {
-                    $scheduling->update(['vehicle_id' => $this->massive_new_resource_id, 'status' => 'Reprogramado']);
+                    $scheduling->update(['vehicle_id' => $newId, 'status' => 'Reprogramado']);
                 } elseif ($this->massive_change_type === 'driver') {
-                    $this->swapGroupDetail($scheduling, $this->massive_old_resource_id, $this->massive_new_resource_id);
+                    $this->swapGroupDetail($scheduling, $oldId, $newId);
                     $scheduling->update(['status' => 'Reprogramado']);
                 } elseif ($this->massive_change_type === 'helper') {
-                    $this->swapGroupDetail($scheduling, $this->massive_old_resource_id, $this->massive_new_resource_id);
+                    $this->swapGroupDetail($scheduling, $oldId, $newId);
                     $scheduling->update(['status' => 'Reprogramado']);
                 }
 
@@ -203,11 +207,8 @@ class Index extends Component
         $this->closeFormModal();
     }
 
-    private function swapGroupDetail(Scheduling $scheduling, ?int $oldId, ?int $newId): void
+    private function swapGroupDetail(Scheduling $scheduling, int $oldId, int $newId): void
     {
-        if ($oldId === null || $newId === null) {
-            return;
-        }
         $detail = $scheduling->groupDetails()->where('employee_id', $oldId)->first();
         if ($detail) {
             $detail->update(['employee_id' => $newId]);
@@ -225,12 +226,14 @@ class Index extends Component
             $query->where('zone_id', $this->massive_zone_id);
         }
 
+        $oldResourceId = (int) $this->massive_old_resource_id;
+
         if ($this->massive_change_type === 'turn') {
-            $query->where('shift_id', $this->massive_old_resource_id);
+            $query->where('shift_id', $oldResourceId);
         } elseif ($this->massive_change_type === 'vehicle') {
-            $query->where('vehicle_id', $this->massive_old_resource_id);
+            $query->where('vehicle_id', $oldResourceId);
         } elseif (in_array($this->massive_change_type, ['driver', 'helper'])) {
-            $query->whereHas('groupDetails', fn ($q) => $q->where('employee_id', $this->massive_old_resource_id));
+            $query->whereHas('groupDetails', fn ($q) => $q->where('employee_id', $oldResourceId));
         }
 
         return $query->orderBy('date')->get()->map(fn ($s) => [
@@ -281,20 +284,18 @@ class Index extends Component
     private function resetMassiveForm(): void
     {
         $this->resetValidation();
-        $this->reset([
-            'massive_start_date',
-            'massive_end_date',
-            'massive_zone_id',
-            'massive_change_type',
-            'massive_old_resource_id',
-            'massive_new_resource_id',
-            'massive_reason_preset',
-            'massive_reason_detail',
-            'massive_reason_full',
-            'showConfirmModal',
-            'previewChanges',
-            'previewAffectedCount',
-        ]);
+        $this->massive_start_date = '';
+        $this->massive_end_date = '';
+        $this->massive_zone_id = null;
+        $this->massive_change_type = '';
+        $this->massive_old_resource_id = '';
+        $this->massive_new_resource_id = '';
+        $this->massive_reason_preset = '';
+        $this->massive_reason_detail = '';
+        $this->massive_reason_full = '';
+        $this->showConfirmModal = false;
+        $this->previewChanges = [];
+        $this->previewAffectedCount = 0;
     }
 
     #[Computed]

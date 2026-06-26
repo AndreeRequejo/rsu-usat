@@ -63,70 +63,44 @@
                         <label class="block text-sm font-medium text-[#333333] mb-1">
                             {{ __('Recurso a Reemplazar') }} <span class="text-[#E53935]">*</span>
                         </label>
-                        <div x-show="$wire.massive_change_type === 'turn'" x-cloak>
-                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar turno...') }}</option>
+                        <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <option value="">{{ __('Seleccionar...') }}</option>
+                            @if ($massive_change_type === 'turn')
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === 'vehicle'" x-cloak>
-                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar vehiculo...') }}</option>
+                            @elseif ($massive_change_type === 'vehicle')
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === 'driver' || $wire.massive_change_type === 'helper'" x-cloak>
-                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar personal...') }}</option>
+                            @elseif (in_array($massive_change_type, ['driver', 'helper']))
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === ''" x-cloak>
-                            <select disabled class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
-                                <option>{{ __('Primero seleccione el tipo de cambio') }}</option>
-                            </select>
-                        </div>
+                            @endif
+                        </select>
                         @error('massive_old_resource_id') <span class="text-xs text-[#E53935] mt-1">{{ $message }}</span> @enderror
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-[#333333] mb-1">
                             {{ __('Nuevo Recurso') }} <span class="text-[#E53935]">*</span>
                         </label>
-                        <div x-show="$wire.massive_change_type === 'turn'" x-cloak>
-                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar turno...') }}</option>
+                        <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <option value="">{{ __('Seleccionar...') }}</option>
+                            @if ($massive_change_type === 'turn')
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === 'vehicle'" x-cloak>
-                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar vehiculo...') }}</option>
+                            @elseif ($massive_change_type === 'vehicle')
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === 'driver' || $wire.massive_change_type === 'helper'" x-cloak>
-                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
-                                <option value="">{{ __('Seleccionar personal...') }}</option>
+                            @elseif (in_array($massive_change_type, ['driver', 'helper']))
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        <div x-show="$wire.massive_change_type === ''" x-cloak>
-                            <select disabled class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
-                                <option>{{ __('Primero seleccione el tipo de cambio') }}</option>
-                            </select>
-                        </div>
+                            @endif
+                        </select>
                         @error('massive_new_resource_id') <span class="text-xs text-[#E53935] mt-1">{{ $message }}</span> @enderror
                     </div>
                 </div>
