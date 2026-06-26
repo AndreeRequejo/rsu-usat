@@ -13,7 +13,7 @@
                 wire:click="openCreate"
                 variant="primary"
                 icon="arrows-right-left"
-                class="bg-[#1976D2] text-white cursor-pointer hover:bg-[#1565C0]!"
+                class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!"
             >
                 {{ __('Nuevo Cambio Masivo') }}
             </flux:button>
@@ -57,7 +57,7 @@
                     wire:click="$refresh"
                     variant="filled"
                     icon="funnel"
-                    class="bg-[#1976D2] text-white cursor-pointer hover:bg-[#1565C0]!"
+                    class="text-white cursor-pointer hover:bg-gray-600"
                 >
                     {{ __('Filtrar') }}
                 </flux:button>

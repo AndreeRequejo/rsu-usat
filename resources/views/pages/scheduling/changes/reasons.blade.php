@@ -13,7 +13,7 @@
                 wire:click="openCreate"
                 variant="primary"
                 icon="plus-circle"
-                class="bg-[#1976D2] text-white cursor-pointer hover:bg-[#1565C0]!"
+                class="bg-[#2E8B57]! text-white cursor-pointer hover:bg-[#257046]!"
             >
                 {{ __('Nuevo Motivo') }}
             </flux:button>
