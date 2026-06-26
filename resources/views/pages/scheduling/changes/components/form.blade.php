@@ -64,28 +64,28 @@
                             {{ __('Recurso a Reemplazar') }} <span class="text-[#E53935]">*</span>
                         </label>
                         @if ($massive_change_type === 'turn')
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_old_resource_id" wire:key="old-shift-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar turno...') }}</option>
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
                                 @endforeach
                             </select>
                         @elseif ($massive_change_type === 'vehicle')
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_old_resource_id" wire:key="old-vehicle-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar vehiculo...') }}</option>
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
                                 @endforeach
                             </select>
                         @elseif (in_array($massive_change_type, ['driver', 'helper']))
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_old_resource_id" wire:key="old-person-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar personal...') }}</option>
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
                             </select>
                         @else
-                            <select disabled class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
+                            <select disabled wire:key="old-empty-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
                                 <option>{{ __('Primero seleccione el tipo de cambio') }}</option>
                             </select>
                         @endif
@@ -96,28 +96,28 @@
                             {{ __('Nuevo Recurso') }} <span class="text-[#E53935]">*</span>
                         </label>
                         @if ($massive_change_type === 'turn')
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_new_resource_id" wire:key="new-shift-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar turno...') }}</option>
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
                                 @endforeach
                             </select>
                         @elseif ($massive_change_type === 'vehicle')
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_new_resource_id" wire:key="new-vehicle-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar vehiculo...') }}</option>
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
                                 @endforeach
                             </select>
                         @elseif (in_array($massive_change_type, ['driver', 'helper']))
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model="massive_new_resource_id" wire:key="new-person-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar personal...') }}</option>
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
                             </select>
                         @else
-                            <select disabled class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
+                            <select disabled wire:key="new-empty-select" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-100 text-sm">
                                 <option>{{ __('Primero seleccione el tipo de cambio') }}</option>
                             </select>
                         @endif
