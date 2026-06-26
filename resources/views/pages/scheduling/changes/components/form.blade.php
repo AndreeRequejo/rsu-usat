@@ -64,7 +64,7 @@
                             {{ __('Recurso a Reemplazar') }} <span class="text-[#E53935]">*</span>
                         </label>
                         <div x-show="$wire.massive_change_type === 'turn'" x-cloak>
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar turno...') }}</option>
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
@@ -72,7 +72,7 @@
                             </select>
                         </div>
                         <div x-show="$wire.massive_change_type === 'vehicle'" x-cloak>
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar vehiculo...') }}</option>
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
@@ -80,7 +80,7 @@
                             </select>
                         </div>
                         <div x-show="$wire.massive_change_type === 'driver' || $wire.massive_change_type === 'helper'" x-cloak>
-                            <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar personal...') }}</option>
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -99,7 +99,7 @@
                             {{ __('Nuevo Recurso') }} <span class="text-[#E53935]">*</span>
                         </label>
                         <div x-show="$wire.massive_change_type === 'turn'" x-cloak>
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar turno...') }}</option>
                                 @foreach ($this->shifts as $shift)
                                     <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
@@ -107,7 +107,7 @@
                             </select>
                         </div>
                         <div x-show="$wire.massive_change_type === 'vehicle'" x-cloak>
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar vehiculo...') }}</option>
                                 @foreach ($this->vehicles as $vehicle)
                                     <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
@@ -115,7 +115,7 @@
                             </select>
                         </div>
                         <div x-show="$wire.massive_change_type === 'driver' || $wire.massive_change_type === 'helper'" x-cloak>
-                            <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                            <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                                 <option value="">{{ __('Seleccionar personal...') }}</option>
                                 @foreach ($this->employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
@@ -228,8 +228,11 @@
                     class="bg-[#1976D2] text-white hover:bg-[#1565C0]"
                     icon="check"
                     wire:click="previewChanges"
+                    wire:loading.attr="disabled"
+                    wire:loading.class="opacity-75"
                 >
-                    {{ __('Guardar') }}
+                    <span wire:loading.remove wire:target="previewChanges">{{ __('Guardar') }}</span>
+                    <span wire:loading wire:target="previewChanges">{{ __('Procesando...') }}</span>
                 </flux:button>
             @else
                 <flux:button type="button" variant="ghost" wire:click="cancelConfirm" class="text-[#333333]">

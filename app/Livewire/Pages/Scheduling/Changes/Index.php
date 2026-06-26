@@ -117,10 +117,17 @@ class Index extends Component
 
     public function previewChanges(): void
     {
-        $this->validate();
-        $this->previewChanges = $this->buildPreview();
-        $this->previewAffectedCount = count($this->previewChanges);
-        $this->showConfirmModal = true;
+        try {
+            $this->validate();
+            $this->previewChanges = $this->buildPreview();
+            $this->previewAffectedCount = count($this->previewChanges);
+            $this->showConfirmModal = true;
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Flux::toast(variant: 'warning', text: 'Por favor complete todos los campos requeridos.');
+            throw $e;
+        } catch (\Throwable $e) {
+            Flux::toast(variant: 'danger', text: 'Error al procesar: ' . $e->getMessage());
+        }
     }
 
     public function cancelConfirm(): void
@@ -196,8 +203,11 @@ class Index extends Component
         $this->closeFormModal();
     }
 
-    private function swapGroupDetail(Scheduling $scheduling, int $oldId, int $newId): void
+    private function swapGroupDetail(Scheduling $scheduling, ?int $oldId, ?int $newId): void
     {
+        if ($oldId === null || $newId === null) {
+            return;
+        }
         $detail = $scheduling->groupDetails()->where('employee_id', $oldId)->first();
         if ($detail) {
             $detail->update(['employee_id' => $newId]);
