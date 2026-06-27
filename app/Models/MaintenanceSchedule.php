@@ -11,22 +11,34 @@ class MaintenanceSchedule extends Model
     protected $table = 'maintenance_schedules';
 
     protected $fillable = [
+        'maintenance_id',
         'vehicle_id',
-        'scheduled_date',
-        'type',
+        'responsible_id',
+        'maintenance_type',
+        'day_of_week',
+        'start_time',
+        'end_time',
     ];
 
-    protected $casts = [
-        'scheduled_date' => 'date',
-    ];
+    protected $casts = [];
+
+    public function maintenance(): BelongsTo
+    {
+        return $this->belongsTo(Maintenance::class);
+    }
 
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
     }
 
-    public function maintenanceRecords(): HasMany
+    public function responsible(): BelongsTo
     {
-        return $this->hasMany(MaintenanceRecord::class);
+        return $this->belongsTo(Employee::class, 'responsible_id');
+    }
+
+    public function details(): HasMany
+    {
+        return $this->hasMany(MaintenanceDetail::class);
     }
 }

@@ -38,6 +38,8 @@ class DatabaseSeeder extends Seeder
             ShiftSeeder::class,
             StaffGroupSeeder::class,
             HolidaySeeder::class,
+            MaintenanceTypeSeeder::class,
+            DayOfWeekSeeder::class,
         ]);
     }
 }

@@ -65,6 +65,15 @@
                     >
                         {{ __('Colores') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="wrench"
+                        :href="route('maintenance.index')"
+                        :current="request()->routeIs('maintenance.*')"
+                        wire:navigate
+                    >
+                        {{ __('Mantenimiento') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 

@@ -1,5 +1,8 @@
 <?php
 
+use App\Livewire\Pages\Maintenance\DetailIndex;
+use App\Livewire\Pages\Maintenance\MaintenanceIndex;
+use App\Livewire\Pages\Maintenance\ScheduleIndex;
 use App\Livewire\Pages\Personnel\Employee;
 use App\Livewire\Pages\Scheduling\Changes\Index as ChangeIndex;
 use App\Livewire\Pages\Scheduling\Changes\Reasons;
@@ -29,6 +32,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('programacion/motivos', Reasons::class)->name('scheduling.changes.reasons');
     Route::livewire('programacion/cambios', ChangeIndex::class)->name('scheduling.changes.index');
     Route::livewire('programacion/programacion', 'scheduling.scheduling.index')->name('scheduling.scheduling.index');
+
+    Route::livewire('mantenimiento/mantenimientos', MaintenanceIndex::class)->name('maintenance.index');
+    Route::livewire('mantenimiento/{maintenanceId}/horarios', ScheduleIndex::class)->name('maintenance.schedules.index');
+    Route::livewire('mantenimiento/horarios/{scheduleId}/dias', DetailIndex::class)->name('maintenance.details.index');
 });
 
 require __DIR__.'/settings.php';
