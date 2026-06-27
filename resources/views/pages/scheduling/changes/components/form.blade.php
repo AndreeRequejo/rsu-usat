@@ -17,6 +17,25 @@
 
         <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
             @if (!$showConfirmModal)
+                {{-- Resumen de errores de validación --}}
+                @if ($errors->any())
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start gap-2">
+                            <svg class="h-5 w-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                            <div>
+                                <p class="text-sm font-bold text-red-800">{{ __('Complete los campos obligatorios') }}</p>
+                                <ul class="list-disc list-inside text-sm text-red-700 mt-1">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Formulario --}}
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
@@ -35,7 +54,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Zonas (Opcional)') }}</label>
-                        <select wire:model="massive_zone_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                        <select wire:model.live="massive_zone_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                             <option value="">{{ __('Todas las zonas') }}</option>
                             @foreach ($this->zones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
@@ -47,7 +66,7 @@
                         <label class="block text-sm font-medium text-[#333333] mb-1">
                             {{ __('Tipo de Cambio') }} <span class="text-[#E53935]">*</span>
                         </label>
-                        <select wire:model="massive_change_type" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                        <select wire:model.live="massive_change_type" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                             <option value="">{{ __('Seleccionar...') }}</option>
                             <option value="turn">{{ __('Cambio de Turno') }}</option>
                             <option value="vehicle">{{ __('Cambio de Vehiculo') }}</option>
@@ -63,7 +82,7 @@
                         <label class="block text-sm font-medium text-[#333333] mb-1">
                             {{ __('Recurso a Reemplazar') }} <span class="text-[#E53935]">*</span>
                         </label>
-                        <select wire:model="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                        <select wire:model.live="massive_old_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                             <option value="">{{ __('Seleccionar...') }}</option>
                             @if ($massive_change_type === 'turn')
                                 @foreach ($this->shifts as $shift)
@@ -85,7 +104,7 @@
                         <label class="block text-sm font-medium text-[#333333] mb-1">
                             {{ __('Nuevo Recurso') }} <span class="text-[#E53935]">*</span>
                         </label>
-                        <select wire:model="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                        <select wire:model.live="massive_new_resource_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
                             <option value="">{{ __('Seleccionar...') }}</option>
                             @if ($massive_change_type === 'turn')
                                 @foreach ($this->shifts as $shift)
@@ -128,7 +147,7 @@
                     <label class="block text-sm font-medium text-[#333333] mb-1">
                         {{ __('Descripcion Completa del Cambio') }} <span class="text-[#E53935]">*</span>
                     </label>
-                    <textarea wire:model="massive_reason_full" rows="2" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]" placeholder="{{ __('Este campo se completa automaticamente con el motivo seleccionado + detalles adicionales') }}"></textarea>
+                    <textarea wire:model="massive_reason_full" rows="2" readonly class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-gray-50 text-sm focus:outline-none cursor-not-allowed" placeholder="{{ __('Este campo se completa automaticamente con el motivo seleccionado + detalles adicionales') }}"></textarea>
                     @error('massive_reason_full') <span class="text-xs text-[#E53935] mt-1">{{ $message }}</span> @enderror
                 </div>
             @else
@@ -202,11 +221,8 @@
                     class="bg-[#1976D2] text-white hover:bg-[#1565C0]"
                     icon="check"
                     wire:click="previewChanges"
-                    wire:loading.attr="disabled"
-                    wire:loading.class="opacity-75"
                 >
-                    <span wire:loading.remove wire:target="previewChanges">{{ __('Guardar') }}</span>
-                    <span wire:loading wire:target="previewChanges">{{ __('Procesando...') }}</span>
+                    {{ __('Guardar') }}
                 </flux:button>
             @else
                 <flux:button type="button" variant="ghost" wire:click="cancelConfirm" class="text-[#333333]">
