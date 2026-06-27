@@ -17,6 +17,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('vehiculos/modelos', 'vehicles.models.index')->name('vehicles.models.index');
     Route::livewire('vehiculos/tipos', 'vehicles.types.index')->name('vehicles.types.index');
     Route::livewire('vehiculos/vehiculos', 'vehicles.vehicles.index')->name('vehicles.vehicles.index');
+    Route::livewire('vehiculos/mantenimiento', 'vehicles.maintenance.index')->name('vehicles.maintenance.index');
+    Route::livewire('vehiculos/mantenimiento/{program}/horarios', 'vehicles.maintenance.schedules')->name('vehicles.maintenance.schedules');
     Route::livewire('personal/tipos', 'personnel.types.index')->name('personnel.types.index');
     Route::livewire('personal/personal', Employee::class)->name('personnel.personnel.index');
     Route::livewire('personal/asistencias', 'personnel.attendance.index')->name('personnel.attendance.index');

@@ -213,7 +213,8 @@ new class extends Component {
             DB::table('vehicleroutes')->where('vehicle_id', $vehicle->id)->count() +
             // DB::table('vehicleimages')->where('vehicle_id', $vehicle->id)->count() +
             $vehicle->schedulings()->count() +
-            $vehicle->maintenanceSchedules()->count();
+            $vehicle->maintenanceSchedules()->count() +
+            $vehicle->vehicleMaintenanceSchedules()->count();
 
         if ($relatedCount > 0) {
             Flux::toast(variant: 'warning', text: __('No se puede eliminar el vehiculo porque tiene registros relacionados.'));
