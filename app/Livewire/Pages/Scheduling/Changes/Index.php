@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Scheduling\Changes;
 
+use App\Models\ChangeReason;
 use App\Models\Employee;
 use App\Models\Scheduling;
 use App\Models\SchedulingChange;
@@ -21,26 +22,42 @@ class Index extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $typeFilter = '';
+
     public ?string $dateFrom = null;
+
     public ?string $dateTo = null;
+
     public int $perPage = 10;
 
     public ?int $viewingId = null;
+
     public ?int $deletingId = null;
 
     // Formulario de cambio masivo
     public string $massive_start_date = '';
+
     public string $massive_end_date = '';
+
     public ?int $massive_zone_id = null;
+
     public string $massive_change_type = '';
-    public string $massive_old_resource_id = '';
-    public string $massive_new_resource_id = '';
+
+    public ?int $massive_old_resource_id = null;
+
+    public ?int $massive_new_resource_id = null;
+
     public string $massive_reason_preset = '';
+
     public string $massive_reason_detail = '';
+
     public string $massive_reason_full = '';
+
     public bool $showConfirmModal = false;
-    public array $previewChanges = [];
+
+    public array $previewResults = [];
+
     public int $previewAffectedCount = 0;
 
     protected function rules(): array
@@ -50,11 +67,11 @@ class Index extends Component
             'massive_end_date' => ['required', 'date', 'after_or_equal:massive_start_date'],
             'massive_zone_id' => ['nullable', 'exists:zones,id'],
             'massive_change_type' => ['required', 'in:turn,vehicle,driver,helper'],
-            'massive_old_resource_id' => ['required', 'integer'],
-            'massive_new_resource_id' => ['required', 'integer', 'different:massive_old_resource_id'],
+            'massive_old_resource_id' => ['required', 'integer', 'min:1'],
+            'massive_new_resource_id' => ['required', 'integer', 'min:1', 'different:massive_old_resource_id'],
             'massive_reason_preset' => ['required', 'string', 'max:100'],
             'massive_reason_detail' => ['nullable', 'string', 'max:255'],
-            'massive_reason_full' => ['required', 'string'],
+            'massive_reason_full' => ['required', 'string', 'min:1'],
         ];
     }
 
@@ -62,13 +79,16 @@ class Index extends Component
     {
         return [
             'massive_start_date.required' => 'La fecha de inicio es obligatoria.',
+            'massive_start_date.date' => 'La fecha de inicio no es valida.',
             'massive_end_date.required' => 'La fecha de fin es obligatoria.',
+            'massive_end_date.date' => 'La fecha de fin no es valida.',
             'massive_end_date.after_or_equal' => 'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
             'massive_change_type.required' => 'Seleccione el tipo de cambio.',
+            'massive_change_type.in' => 'El tipo de cambio seleccionado no es valido.',
             'massive_old_resource_id.required' => 'Seleccione el recurso a reemplazar.',
-            'massive_old_resource_id.integer' => 'Seleccione un recurso valido.',
+            'massive_old_resource_id.min' => 'Seleccione un recurso valido.',
             'massive_new_resource_id.required' => 'Seleccione el nuevo recurso.',
-            'massive_new_resource_id.integer' => 'Seleccione un recurso valido.',
+            'massive_new_resource_id.min' => 'Seleccione un recurso valido.',
             'massive_new_resource_id.different' => 'El nuevo recurso debe ser diferente al anterior.',
             'massive_reason_preset.required' => 'Seleccione un motivo predefinido.',
             'massive_reason_full.required' => 'La descripcion completa es obligatoria.',
@@ -77,8 +97,8 @@ class Index extends Component
 
     public function updatedMassiveChangeType(): void
     {
-        $this->massive_old_resource_id = '';
-        $this->massive_new_resource_id = '';
+        $this->massive_old_resource_id = null;
+        $this->massive_new_resource_id = null;
     }
 
     public function updatedMassiveReasonPreset(): void
@@ -119,12 +139,14 @@ class Index extends Component
 
     public function previewChanges(): void
     {
+        $this->buildReasonFull();
         $this->validate();
-        $this->previewChanges = $this->buildPreview();
-        $this->previewAffectedCount = count($this->previewChanges);
+        $this->previewResults = $this->buildPreview();
+        $this->previewAffectedCount = count($this->previewResults);
 
         if ($this->previewAffectedCount === 0) {
             Flux::toast(variant: 'warning', text: 'No se encontraron programaciones que coincidan con los criterios seleccionados. Verifique que existan programaciones en el rango de fechas con el recurso seleccionado.');
+
             return;
         }
 
@@ -140,6 +162,7 @@ class Index extends Component
     {
         if ($this->previewAffectedCount === 0) {
             Flux::toast(variant: 'warning', text: 'No hay programaciones afectadas para aplicar el cambio.');
+
             return;
         }
 
@@ -166,9 +189,11 @@ class Index extends Component
                 'affected_count' => $this->previewAffectedCount,
             ]);
 
-            foreach ($this->previewChanges as $preview) {
+            foreach ($this->previewResults as $preview) {
                 $scheduling = Scheduling::find($preview['scheduling_id']);
-                if (! $scheduling) continue;
+                if (! $scheduling) {
+                    continue;
+                }
 
                 $before = [
                     'shift_id' => $scheduling->shift_id,
@@ -241,8 +266,8 @@ class Index extends Component
             'date' => $s->date->format('d/m/Y'),
             'zone' => $s->zone->name ?? '-',
             'shift' => $s->shift->name ?? '-',
-            'vehicle' => ($s->vehicle->name ?? '') . ' (' . ($s->vehicle->plate ?? '') . ')',
-            'employees' => $s->groupDetails->map(fn ($gd) => ($gd->employee->first_name ?? '') . ' ' . ($gd->employee->last_name ?? ''))->implode(', '),
+            'vehicle' => ($s->vehicle->name ?? '').' ('.($s->vehicle->plate ?? '').')',
+            'employees' => $s->groupDetails->map(fn ($gd) => ($gd->employee->first_name ?? '').' '.($gd->employee->last_name ?? ''))->implode(', '),
         ])->toArray();
     }
 
@@ -266,7 +291,9 @@ class Index extends Component
 
     public function delete(): void
     {
-        if (! $this->deletingId) return;
+        if (! $this->deletingId) {
+            return;
+        }
 
         $change = SchedulingChange::findOrFail($this->deletingId);
         $change->delete();
@@ -288,13 +315,13 @@ class Index extends Component
         $this->massive_end_date = '';
         $this->massive_zone_id = null;
         $this->massive_change_type = '';
-        $this->massive_old_resource_id = '';
-        $this->massive_new_resource_id = '';
+        $this->massive_old_resource_id = null;
+        $this->massive_new_resource_id = null;
         $this->massive_reason_preset = '';
         $this->massive_reason_detail = '';
         $this->massive_reason_full = '';
         $this->showConfirmModal = false;
-        $this->previewChanges = [];
+        $this->previewResults = [];
         $this->previewAffectedCount = 0;
     }
 
@@ -320,7 +347,10 @@ class Index extends Component
     #[Computed]
     public function viewingChange()
     {
-        if (! $this->viewingId) return null;
+        if (! $this->viewingId) {
+            return null;
+        }
+
         return SchedulingChange::with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson', 'items.scheduling.zone', 'items.scheduling.shift', 'items.scheduling.vehicle', 'items.scheduling.groupDetails.employee'])
             ->find($this->viewingId);
     }
@@ -352,7 +382,7 @@ class Index extends Component
     #[Computed]
     public function reasonPresets(): array
     {
-        return \App\Models\ChangeReason::where('is_active', true)
+        return ChangeReason::where('is_active', true)
             ->orderBy('name')
             ->pluck('name', 'name')
             ->toArray();
