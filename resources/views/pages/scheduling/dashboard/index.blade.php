@@ -6,7 +6,8 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\EmployeeType;
 use App\Models\GroupDetail;
-use App\Models\SchedulingHistory;
+use App\Models\SchedulingChange;
+use App\Models\SchedulingChangeItem;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Models\Vacation;
@@ -358,14 +359,17 @@ new class extends Component {
         }
 
         $scheduling = Scheduling::with('groupDetails')->findOrFail($this->editingId);
-        $before = [
+        $date       = $scheduling->date?->toDateString() ?? Carbon::parse($this->date)->toDateString();
+
+        $beforeSnapshot = [
             'shift_id'   => $scheduling->shift_id,
             'vehicle_id' => $scheduling->vehicle_id,
             'employees'  => $scheduling->groupDetails->pluck('employee_id')->values()->all(),
         ];
 
+        // Apply changes to local state
         foreach ($this->registeredChanges as $change) {
-            if ($change['field'] === 'shift_id')   $this->shift_id   = (int) $change['new_id'];
+            if ($change['field'] === 'shift_id')    $this->shift_id   = (int) $change['new_id'];
             if ($change['field'] === 'vehicle_id')  $this->vehicle_id = (int) $change['new_id'];
             if ($change['field'] === 'driver_id')   $this->driver_id  = (int) $change['new_id'];
             if (str_starts_with($change['field'], 'helper_ids.')) {
@@ -380,6 +384,7 @@ new class extends Component {
             return;
         }
 
+        // Update scheduling
         $scheduling->update([
             'shift_id'   => $this->shift_id,
             'vehicle_id' => $this->vehicle_id,
@@ -388,18 +393,55 @@ new class extends Component {
 
         // Sync group details
         $scheduling->groupDetails()->delete();
-        $allIds = collect(array_merge([$this->driver_id], $this->helper_ids))->filter()->unique()->values();
+        $allIds = collect(array_merge([$this->driver_id], $this->helper_ids))
+            ->filter()->unique()->values();
         foreach ($allIds as $empId) {
             $scheduling->groupDetails()->create(['employee_id' => $empId]);
         }
 
+        // Write one SchedulingChange record per registered change
         foreach ($this->registeredChanges as $change) {
-            SchedulingHistory::create([
-                'scheduling_id' => $scheduling->id,
-                'action'        => 'Reprogramacion - ' . $change['label'],
-                'description'   => $change['reason'],
-                'changes'       => ['before' => $change['old_value'], 'after' => $change['new_value'], 'snapshot_before' => $before],
-                'user_id'       => auth()->id(),
+            $changeType = match ($change['field']) {
+                'shift_id'                                      => 'turn',
+                'vehicle_id'                                    => 'vehicle',
+                'driver_id'                                     => 'driver',
+                default => str_starts_with($change['field'], 'helper_ids.') ? 'helper' : 'driver',
+            };
+
+            $personRole = match ($changeType) {
+                'driver' => 'driver',
+                'helper' => 'helper',
+                default  => null,
+            };
+
+            $record = SchedulingChange::create([
+                'user_id'        => auth()->id(),
+                'change_type'    => $changeType,
+                'start_date'     => $date,
+                'end_date'       => $date,
+                'zone_id'        => $scheduling->zone_id,
+                'old_shift_id'   => $changeType === 'turn'    ? (int) $change['old_id']  : null,
+                'new_shift_id'   => $changeType === 'turn'    ? (int) $change['new_id']  : null,
+                'old_vehicle_id' => $changeType === 'vehicle' ? (int) $change['old_id']  : null,
+                'new_vehicle_id' => $changeType === 'vehicle' ? (int) $change['new_id']  : null,
+                'old_person_id'  => in_array($changeType, ['driver', 'helper']) ? (int) $change['old_id'] : null,
+                'new_person_id'  => in_array($changeType, ['driver', 'helper']) ? (int) $change['new_id'] : null,
+                'person_role'    => $personRole,
+                'reason_preset'  => $change['reason'] ?? null,
+                'reason_detail'  => null,
+                'reason_full'    => $change['reason'] ?? null,
+                'affected_count' => 1,
+            ]);
+
+            SchedulingChangeItem::create([
+                'scheduling_change_id' => $record->id,
+                'scheduling_id'        => $scheduling->id,
+                'before'               => $beforeSnapshot,
+                'after'                => [
+                    'shift_id'   => $this->shift_id,
+                    'vehicle_id' => $this->vehicle_id,
+                    'employees'  => $allIds->all(),
+                ],
             ]);
         }
 

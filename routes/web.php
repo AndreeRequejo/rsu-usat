@@ -1,6 +1,8 @@
 <?php
 
 use App\Livewire\Pages\Personnel\Employee;
+use App\Livewire\Pages\Scheduling\Changes\Index as ChangeIndex;
+use App\Livewire\Pages\Scheduling\Changes\Reasons;
 use App\Livewire\Pages\Scheduling\Holidays\Index as HolidayIndex;
 use App\Livewire\Pages\Scheduling\Zones\Zone;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +26,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('programacion/zonas', Zone::class)->name('scheduling.zones.index');
     Route::livewire('programacion/feriados', HolidayIndex::class)->name('scheduling.holidays.index');
     Route::livewire('programacion/grupos', 'scheduling.groups.index')->name('scheduling.groups.index');
+    Route::livewire('programacion/motivos', Reasons::class)->name('scheduling.changes.reasons');
+    Route::livewire('programacion/cambios', ChangeIndex::class)->name('scheduling.changes.index');
     Route::livewire('programacion/programacion', 'scheduling.scheduling.index')->name('scheduling.scheduling.index');
 });
 

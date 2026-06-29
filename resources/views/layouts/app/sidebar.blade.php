@@ -166,6 +166,28 @@
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
+            <flux:sidebar.nav>
+                <flux:sidebar.group expandable :heading="__('Gestión de cambios')" icon="arrows-right-left" class="grid">
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('scheduling.changes.reasons')"
+                        :current="request()->routeIs('scheduling.changes.reasons')"
+                        wire:navigate
+                    >
+                        {{ __('Motivos') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="document-text"
+                        :href="route('scheduling.changes.index')"
+                        :current="request()->routeIs('scheduling.changes.index')"
+                        wire:navigate
+                    >
+                        {{ __('Cambios') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+            </flux:sidebar.nav>
+
             <flux:spacer />
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
