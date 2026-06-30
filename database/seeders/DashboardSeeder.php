@@ -47,8 +47,8 @@ class DashboardSeeder extends Seeder
             GroupDetail::firstOrCreate(['scheduling_id' => $sched1->id, 'employee_id' => $emp->id]);
 
             Attendance::firstOrCreate(
-                ['employee_id' => $emp->id, 'attendance_date' => $today, 'type' => 'ingreso'],
-                ['shift_id' => $shift->id, 'attendance_time' => '06:05:00', 'status' => 'presente', 'notes' => 'Prueba']
+                ['employee_id' => $emp->id, 'attendance_date' => $today, 'type' => 'Ingreso'],
+                ['shift_id' => $shift->id, 'attendance_time' => '06:05:00', 'status' => 'Presente', 'notes' => 'Prueba']
             );
         }
 
@@ -67,8 +67,8 @@ class DashboardSeeder extends Seeder
 
             if ($index === 0) {
                 Attendance::firstOrCreate(
-                    ['employee_id' => $emp->id, 'attendance_date' => $today, 'type' => 'ingreso'],
-                    ['shift_id' => $shift->id, 'attendance_time' => '06:10:00', 'status' => 'presente', 'notes' => 'Prueba']
+                    ['employee_id' => $emp->id, 'attendance_date' => $today, 'type' => 'Ingreso'],
+                    ['shift_id' => $shift->id, 'attendance_time' => '06:10:00', 'status' => 'Presente', 'notes' => 'Prueba']
                 );
             }
         }
