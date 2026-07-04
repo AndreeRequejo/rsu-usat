@@ -9,6 +9,7 @@ use App\Models\Zone as ZoneModel;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -259,6 +260,12 @@ class Zone extends Component
 
         $validated = $this->validate();
         $coords = $this->coords;
+
+        if (count($coords) >= 3 && ZoneModel::hasOverlap($coords, $this->editingId, $validated['district_id'])) {
+            throw ValidationException::withMessages([
+                'coords' => 'El polígono de la zona se superpone con una zona existente. Verifique las coordenadas e intente nuevamente.',
+            ]);
+        }
 
         $area = $this->calculateArea($coords);
 
