@@ -19,9 +19,10 @@ return new class extends Migration
             $table->decimal('average_waste', 10, 2)->nullable();
             $table->string('status', 50)->default('active');
             $table->foreignId('sector_id')
+                ->nullable()
                 ->constrained('sectors')
                 ->cascadeOnUpdate()
-                ->cascadeOnDelete();
+                ->nullOnDelete();
             $table->foreignId('district_id')
                 ->constrained('districts')
                 ->cascadeOnUpdate()

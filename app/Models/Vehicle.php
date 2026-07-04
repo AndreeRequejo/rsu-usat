@@ -58,11 +58,6 @@ class Vehicle extends Model
         return $this->hasMany(Scheduling::class);
     }
 
-    public function maintenanceSchedules(): HasMany
-    {
-        return $this->hasMany(MaintenanceSchedule::class);
-    }
-
     public function vehicleImages(): HasMany
     {
         return $this->hasMany(VehicleImage::class);
