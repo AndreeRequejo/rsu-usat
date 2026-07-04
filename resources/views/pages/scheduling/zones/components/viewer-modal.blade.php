@@ -1,4 +1,4 @@
-<flux:modal name="zone-viewer" class="w-[1000px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col" wire:close="closeViewer">
+<flux:modal name="zone-viewer" class="w-[1000px] max-w-[98vw] max-h-[95vh] overflow-hidden" wire:close="closeViewer">
     @if ($viewingId)
         @livewire(\App\Livewire\Pages\Scheduling\Zones\ZoneViewer::class, [
             'key' => 'viewer-'.$viewingId,

@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-white p-6 text-[#333333]">
+<div class="bg-white p-6 text-[#333333]">
     <div class="flex items-start justify-between mb-6">
         <div>
             <h1 class="text-3xl font-bold text-[#2E8B57]">

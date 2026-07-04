@@ -4,7 +4,7 @@
 
     <flux:modal
         name="zone-form"
-        class="w-[950px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col"
+        class="w-[950px] max-w-[98vw] max-h-[95vh] overflow-hidden"
         wire:close="closeFormModal"
         data-zone-storage-key="{{ $storageKey }}"
     >

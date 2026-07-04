@@ -1,6 +1,6 @@
 <flux:modal
     name="change-form"
-    class="w-[900px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col"
+    class="w-[900px] max-w-[98vw] max-h-[95vh] overflow-hidden"
     wire:close="closeFormModal"
 >
     <div class="flex flex-col h-full">

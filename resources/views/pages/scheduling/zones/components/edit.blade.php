@@ -1,4 +1,4 @@
-<flux:modal name="zone-edit" class="w-[950px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col" wire:close="closeEditModal">
+<flux:modal name="zone-edit" class="w-[950px] max-w-[98vw] max-h-[95vh] overflow-hidden" wire:close="closeEditModal">
     @php
         $editCoords = [];
         if ($editingId) {
