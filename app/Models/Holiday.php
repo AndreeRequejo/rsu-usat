@@ -14,7 +14,7 @@ class Holiday extends Model
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'date:Y-m-d',
         'is_active' => 'boolean',
     ];
 

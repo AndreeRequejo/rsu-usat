@@ -5,6 +5,7 @@ namespace App\Livewire\Pages\Scheduling\Holidays;
 use App\Models\Holiday;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -35,6 +36,13 @@ class Index extends Component
     public bool $is_active = true;
 
     public int $perPage = 10;
+
+    public int $loadYear;
+
+    public function mount(): void
+    {
+        $this->loadYear = (int) now()->year;
+    }
 
     public function updatedSearch(): void
     {
@@ -209,10 +217,73 @@ class Index extends Component
 
     public function loadPeruHolidays(): void
     {
-        $seeder = new \Database\Seeders\HolidaySeeder();
-        $seeder->run();
+        $year = $this->loadYear;
 
-        Flux::toast(variant: 'success', text: 'Feriados oficiales de Perú cargados correctamente.');
+        if ($year < 2000 || $year > 2100) {
+            Flux::toast(variant: 'warning', text: 'El año debe estar entre 2000 y 2100.');
+
+            return;
+        }
+
+        $existingCount = Holiday::whereYear('date', $year)->count();
+
+        if ($existingCount > 0) {
+            Flux::toast(variant: 'warning', text: "Los feriados de {$year} ya están cargados ({$existingCount} registros).");
+
+            return;
+        }
+
+        try {
+            $response = Http::timeout(10)->get("https://date.nager.at/api/v3/publicholidays/{$year}/PE");
+        } catch (\Throwable $e) {
+            Flux::toast(variant: 'danger', text: 'Error de conexión al servicio de feriados. Verifica tu conexión a internet.');
+
+            return;
+        }
+
+        if ($response->failed()) {
+            Flux::toast(variant: 'danger', text: 'No se pudieron obtener los feriados. El servicio puede no estar disponible para el año solicitado.');
+
+            return;
+        }
+
+        $holidays = $response->json();
+
+        if (! is_array($holidays) || count($holidays) === 0) {
+            Flux::toast(variant: 'warning', text: "No se encontraron feriados para el año {$year}.");
+
+            return;
+        }
+
+        $imported = 0;
+        $processedDates = [];
+
+        foreach ($holidays as $holiday) {
+            if (! isset($holiday['date'], $holiday['localName'])) {
+                continue;
+            }
+
+            $date = $holiday['date'];
+
+            if (in_array($date, $processedDates, true)) {
+                continue;
+            }
+
+            $processedDates[] = $date;
+
+            Holiday::updateOrCreate(
+                ['date' => $date],
+                [
+                    'name' => $holiday['localName'],
+                    'description' => 'Feriado nacional.',
+                    'is_active' => true,
+                ]
+            );
+
+            $imported++;
+        }
+
+        Flux::toast(variant: 'success', text: "{$imported} feriados de Perú cargados correctamente para el {$year}.");
     }
 
     public function resetFilters(): void
