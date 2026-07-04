@@ -54,7 +54,7 @@
         </div>
         <div class="rounded-xl p-5 text-white shadow-sm" style="background-color: #00BCD4;">
             <div class="text-3xl font-bold">{{ $this->stats['current_year'] }}</div>
-            <div class="text-sm opacity-90">{{ __('Anio Actual') }}</div>
+            <div class="text-sm opacity-90">{{ __('Año Actual') }}</div>
         </div>
     </div>
 
