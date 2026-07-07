@@ -39,11 +39,28 @@
         </thead>
         <tbody>
             @forelse ($this->changes as $i => $change)
+                @php
+                    $isExpanded = in_array($change->composite_id, $this->expandedChanges, true);
+                    $hasItems = $change->type === 'massive' && $change->items->count() > 0;
+                @endphp
                 <tr wire:key="change-{{ $change->composite_id }}" class="{{ $i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20' }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition">
                     <td class="px-4 py-3 text-center">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#E8F5E9] text-[#2E8B57] border border-[#A5D6A7]">
-                            {{ $change->type_label }}
-                        </span>
+                        <div class="flex items-center justify-center gap-1">
+                            @if ($hasItems)
+                                <button wire:click="toggleExpand('{{ $change->composite_id }}')" class="inline-flex h-6 w-6 items-center justify-center rounded bg-[#1976D2] text-white hover:bg-[#1565C0] transition" title="{{ $isExpanded ? __('Colapsar') : __('Desglosar') }}" aria-label="{{ $isExpanded ? __('Colapsar') : __('Desglosar') }}">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        @if ($isExpanded)
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                                        @else
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                        @endif
+                                    </svg>
+                                </button>
+                            @endif
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#E8F5E9] text-[#2E8B57] border border-[#A5D6A7]">
+                                {{ $change->type_label }}
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-3 text-center">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{ $change->badge_color }}">
@@ -102,6 +119,36 @@
                         </div>
                     </td>
                 </tr>
+                @if ($isExpanded && $hasItems)
+                    <tr wire:key="change-{{ $change->composite_id }}-details" class="bg-[#F5F5F5] border-b border-[#A5D6A7]">
+                        <td colspan="9" class="px-4 py-3">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm border border-[#A5D6A7] rounded-lg overflow-hidden">
+                                    <thead class="bg-[#2E8B57] text-white">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">{{ __('Fecha') }}</th>
+                                            <th class="px-3 py-2 text-left">{{ __('Zona') }}</th>
+                                            <th class="px-3 py-2 text-left">{{ __('Turno') }}</th>
+                                            <th class="px-3 py-2 text-left">{{ __('Vehiculo') }}</th>
+                                            <th class="px-3 py-2 text-left">{{ __('Personal') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($change->items as $item)
+                                            <tr class="border-b border-[#A5D6A7] bg-white">
+                                                <td class="px-3 py-2">{{ $item->scheduling?->date?->format('d/m/Y') ?? '-' }}</td>
+                                                <td class="px-3 py-2">{{ $item->scheduling?->zone?->name ?? '-' }}</td>
+                                                <td class="px-3 py-2">{{ $item->scheduling?->shift?->name ?? '-' }}</td>
+                                                <td class="px-3 py-2">{{ $item->scheduling?->vehicle?->name ?? '-' }}</td>
+                                                <td class="px-3 py-2">{{ $item->scheduling?->groupDetails?->map(fn($gd) => ($gd->employee?->first_name ?? '') . ' ' . ($gd->employee?->last_name ?? ''))->implode(', ') ?? '-' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                @endif
             @empty
                 <tr>
                     <td colspan="9" class="px-4 py-10 text-center text-sm text-[#333333]">

@@ -38,6 +38,8 @@ class Index extends Component
 
     public ?int $deletingId = null;
 
+    public array $expandedChanges = [];
+
     // Formulario de cambio masivo
     public string $massive_start_date = '';
 
@@ -286,6 +288,15 @@ class Index extends Component
         Flux::modal('change-viewer')->close();
     }
 
+    public function toggleExpand(string $compositeId): void
+    {
+        if (in_array($compositeId, $this->expandedChanges, true)) {
+            $this->expandedChanges = array_values(array_filter($this->expandedChanges, fn ($id) => $id !== $compositeId));
+        } else {
+            $this->expandedChanges[] = $compositeId;
+        }
+    }
+
     public function confirmDelete(int $id): void
     {
         $this->deletingId = $id;
@@ -355,7 +366,7 @@ class Index extends Component
     private function fetchMassiveChanges()
     {
         return SchedulingChange::query()
-            ->with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson'])
+            ->with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson', 'items.scheduling.zone', 'items.scheduling.shift', 'items.scheduling.vehicle', 'items.scheduling.groupDetails.employee'])
             ->when($this->search !== '', function (Builder $query) {
                 $query->where(function (Builder $q) {
                     $q->where('reason_full', 'like', '%'.$this->search.'%')
@@ -420,6 +431,7 @@ class Index extends Component
         $item->reason = $change->reason_full;
         $item->user = $change->user;
         $item->affected_count = $change->affected_count;
+        $item->items = $change->items;
         $item->source = $change;
 
         return $item;
