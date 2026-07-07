@@ -1,7 +1,7 @@
 @if ($this->viewingChange)
 <flux:modal
     name="change-viewer"
-    class="w-[900px] max-w-[98vw] max-h-[95vh] overflow-hidden"
+    class="w-[900px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col"
     wire:close="closeViewer"
 >
     <div class="flex flex-col h-full">

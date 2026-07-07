@@ -27,9 +27,11 @@
         <thead>
             <tr class="bg-[#2E8B57] text-white text-xs font-bold uppercase tracking-wider">
                 <th class="px-4 py-3 text-left">{{ __('Tipo de cambio') }}</th>
-                <th class="px-4 py-3 text-left">{{ __('Fecha cambio') }}</th>
+                <th class="px-4 py-3 text-left">{{ __('Periodo') }}</th>
+                <th class="px-4 py-3 text-left">{{ __('Zona') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Antes') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Despues') }}</th>
+                <th class="px-4 py-3 text-left">{{ __('Motivo') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Realizado por') }}</th>
                 <th class="px-4 py-3 text-right">{{ __('Acciones') }}</th>
             </tr>
@@ -41,10 +43,19 @@
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{ $change->type_badge_color }}">
                             {{ $change->type_label }}
                         </span>
+                        <div class="text-xs text-[#666666] mt-1">{{ __('Masivo') }}</div>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
                         <div class="font-semibold">{{ $change->created_at->format('d/m/Y') }}</div>
                         <div class="text-xs text-[#666666]">{{ $change->created_at->format('H:i') }}</div>
+                        <div class="text-xs text-[#999999] mt-1">
+                            {{ $change->start_date?->format('d/m/Y') ?? '-' }} - {{ $change->end_date?->format('d/m/Y') ?? '-' }}
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-[#333333]">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#E3F2FD] text-[#1976D2]">
+                            {{ $change->zone?->name ?? __('Todas las zonas') }}
+                        </span>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
                         @if ($change->change_type === 'turn')
@@ -69,6 +80,11 @@
                         @else
                             -
                         @endif
+                    </td>
+                    <td class="px-4 py-3 text-sm text-[#333333]">
+                        <div class="max-w-[180px] truncate" title="{{ $change->reason_full }}">
+                            {{ $change->reason_full ?? '-' }}
+                        </div>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
                         <div class="flex items-center gap-2">
@@ -99,7 +115,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="px-4 py-10 text-center text-sm text-[#333333]">
+                    <td colspan="8" class="px-4 py-10 text-center text-sm text-[#333333]">
                         {{ __('No hay cambios registrados.') }}
                     </td>
                 </tr>
