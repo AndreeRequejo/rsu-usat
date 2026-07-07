@@ -26,7 +26,8 @@
     <table class="w-full">
         <thead>
             <tr class="bg-[#2E8B57] text-white text-xs font-bold uppercase tracking-wider">
-                <th class="px-4 py-3 text-left">{{ __('Tipo de cambio') }}</th>
+                <th class="px-4 py-3 text-left">{{ __('Tipo') }}</th>
+                <th class="px-4 py-3 text-left">{{ __('Cambio') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Periodo') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Zona') }}</th>
                 <th class="px-4 py-3 text-left">{{ __('Antes') }}</th>
@@ -38,12 +39,16 @@
         </thead>
         <tbody>
             @forelse ($this->changes as $i => $change)
-                <tr wire:key="change-{{ $change->id }}" class="{{ $i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20' }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition">
+                <tr wire:key="change-{{ $change->composite_id }}" class="{{ $i % 2 === 0 ? 'bg-white' : 'bg-[#A5D6A7]/20' }} border-b border-[#A5D6A7] hover:bg-[#A5D6A7]/30 transition">
                     <td class="px-4 py-3 text-center">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{ $change->type_badge_color }}">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#E8F5E9] text-[#2E8B57] border border-[#A5D6A7]">
                             {{ $change->type_label }}
                         </span>
-                        <div class="text-xs text-[#666666] mt-1">{{ __('Masivo') }}</div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{ $change->badge_color }}">
+                            {{ $change->change_label }}
+                        </span>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
                         <div class="font-semibold">{{ $change->created_at->format('d/m/Y') }}</div>
@@ -54,36 +59,18 @@
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#E3F2FD] text-[#1976D2]">
-                            {{ $change->zone?->name ?? __('Todas las zonas') }}
+                            {{ $change->zone_name }}
                         </span>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
-                        @if ($change->change_type === 'turn')
-                            <span class="text-red-600">{{ $change->oldShift?->name ?? '-' }}</span>
-                            <div class="text-xs text-[#666666]">{{ $change->oldShift?->hour_in }} - {{ $change->oldShift?->hour_out }}</div>
-                        @elseif ($change->change_type === 'vehicle')
-                            <span class="text-red-600">{{ $change->oldVehicle?->name ?? '-' }}</span>
-                        @elseif (in_array($change->change_type, ['driver', 'helper']))
-                            <span class="text-red-600">{{ ($change->oldPerson?->first_name ?? '') . ' ' . ($change->oldPerson?->last_name ?? '') }}</span>
-                        @else
-                            -
-                        @endif
+                        <span class="text-red-600">{{ $change->old_value }}</span>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
-                        @if ($change->change_type === 'turn')
-                            <span class="text-green-600 font-semibold">{{ $change->newShift?->name ?? '-' }}</span>
-                            <div class="text-xs text-[#666666]">{{ $change->newShift?->hour_in }} - {{ $change->newShift?->hour_out }}</div>
-                        @elseif ($change->change_type === 'vehicle')
-                            <span class="text-green-600 font-semibold">{{ $change->newVehicle?->name ?? '-' }}</span>
-                        @elseif (in_array($change->change_type, ['driver', 'helper']))
-                            <span class="text-green-600 font-semibold">{{ ($change->newPerson?->first_name ?? '') . ' ' . ($change->newPerson?->last_name ?? '') }}</span>
-                        @else
-                            -
-                        @endif
+                        <span class="text-green-600 font-semibold">{{ $change->new_value }}</span>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
-                        <div class="max-w-[180px] truncate" title="{{ $change->reason_full }}">
-                            {{ $change->reason_full ?? '-' }}
+                        <div class="max-w-[180px] truncate" title="{{ $change->reason }}">
+                            {{ $change->reason ?? '-' }}
                         </div>
                     </td>
                     <td class="px-4 py-3 text-sm text-[#333333]">
@@ -99,23 +86,25 @@
                     </td>
                     <td class="px-4 py-3">
                         <div class="flex justify-end gap-2">
-                            <button wire:click="openView({{ $change->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#1976D2] hover:bg-[#1976D2]/20 transition" title="Ver detalle" aria-label="Ver detalle">
+                            <button wire:click="openView('{{ $change->composite_id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#1976D2] hover:bg-[#1976D2]/20 transition" title="Ver detalle" aria-label="Ver detalle">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 5.25 12 5.25c4.638 0 8.573 2.25 9.963 6.516.146.41.146.861 0 1.272C20.577 16.49 16.64 18.75 12 18.75c-4.638 0-8.573-2.25-9.963-6.516z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </button>
-                            <button wire:click="confirmDelete({{ $change->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#E53935] hover:bg-[#E53935]/20 transition" title="Eliminar" aria-label="Eliminar">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
-                                </svg>
-                            </button>
+                            @if ($change->type === 'massive')
+                                <button wire:click="confirmDelete({{ $change->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#E53935] hover:bg-[#E53935]/20 transition" title="Eliminar" aria-label="Eliminar">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M7 7l1 12a2 2 0 002 2h4a2 2 0 002-2l1-12" />
+                                    </svg>
+                                </button>
+                            @endif
                         </div>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="px-4 py-10 text-center text-sm text-[#333333]">
+                    <td colspan="9" class="px-4 py-10 text-center text-sm text-[#333333]">
                         {{ __('No hay cambios registrados.') }}
                     </td>
                 </tr>

@@ -7,15 +7,18 @@ use App\Models\Employee;
 use App\Models\Scheduling;
 use App\Models\SchedulingChange;
 use App\Models\SchedulingChangeItem;
+use App\Models\SchedulingHistory;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Models\Zone;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
+use stdClass;
 
 class Index extends Component
 {
@@ -31,7 +34,7 @@ class Index extends Component
 
     public int $perPage = 10;
 
-    public ?int $viewingId = null;
+    public ?string $viewingId = null;
 
     public ?int $deletingId = null;
 
@@ -271,9 +274,9 @@ class Index extends Component
         ])->toArray();
     }
 
-    public function openView(int $id): void
+    public function openView(string $compositeId): void
     {
-        $this->viewingId = $id;
+        $this->viewingId = $compositeId;
         Flux::modal('change-viewer')->show();
     }
 
@@ -328,6 +331,29 @@ class Index extends Component
     #[Computed]
     public function changes()
     {
+        $massive = $this->fetchMassiveChanges();
+        $individual = $this->fetchIndividualChanges();
+
+        $combined = $massive->merge($individual)
+            ->sortByDesc('created_at')
+            ->values();
+
+        $page = $this->getPage();
+        $perPage = $this->perPage;
+        $total = $combined->count();
+        $items = $combined->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
+    }
+
+    private function fetchMassiveChanges()
+    {
         return SchedulingChange::query()
             ->with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson'])
             ->when($this->search !== '', function (Builder $query) {
@@ -341,7 +367,166 @@ class Index extends Component
             ->when($this->dateFrom, fn (Builder $q) => $q->whereDate('created_at', '>=', $this->dateFrom))
             ->when($this->dateTo, fn (Builder $q) => $q->whereDate('created_at', '<=', $this->dateTo))
             ->orderBy('created_at', 'desc')
-            ->paginate($this->perPage);
+            ->get()
+            ->map(fn ($change) => $this->normalizeMassiveChange($change));
+    }
+
+    private function fetchIndividualChanges()
+    {
+        return SchedulingHistory::query()
+            ->with(['user', 'scheduling.zone', 'scheduling.shift', 'scheduling.vehicle', 'scheduling.groupDetails.employee'])
+            ->where(function (Builder $q) {
+                $q->where('action', 'like', 'Reprogramacion%')
+                    ->orWhere('action', 'like', 'Creacion%')
+                    ->orWhere('action', 'like', 'Finalizacion%')
+                    ->orWhere('action', 'like', 'Eliminacion%');
+            })
+            ->when($this->search !== '', function (Builder $query) {
+                $query->where(function (Builder $q) {
+                    $q->where('description', 'like', '%'.$this->search.'%')
+                        ->orWhere('action', 'like', '%'.$this->search.'%')
+                        ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', '%'.$this->search.'%'));
+                });
+            })
+            ->when($this->dateFrom, fn (Builder $q) => $q->whereDate('created_at', '>=', $this->dateFrom))
+            ->when($this->dateTo, fn (Builder $q) => $q->whereDate('created_at', '<=', $this->dateTo))
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($history) => $this->normalizeIndividualChange($history))
+            ->filter(fn ($item) => $this->typeFilter === '' || $item->change_type === $this->typeFilter);
+    }
+
+    private function normalizeMassiveChange(SchedulingChange $change): stdClass
+    {
+        $item = new stdClass;
+        $item->id = $change->id;
+        $item->composite_id = 'massive-'.$change->id;
+        $item->type = 'massive';
+        $item->type_label = __('Masivo');
+        $item->change_type = $change->change_type;
+        $item->change_label = $change->type_label;
+        $item->badge_color = $change->type_badge_color;
+        $item->created_at = $change->created_at;
+        $item->start_date = $change->start_date;
+        $item->end_date = $change->end_date;
+        $item->zone = $change->zone;
+        $item->zone_name = $change->zone?->name ?? __('Todas las zonas');
+        $item->old_value = $this->massiveValue($change, 'old');
+        $item->new_value = $this->massiveValue($change, 'new');
+        $item->reason = $change->reason_full;
+        $item->user = $change->user;
+        $item->affected_count = $change->affected_count;
+        $item->source = $change;
+
+        return $item;
+    }
+
+    private function normalizeIndividualChange(SchedulingHistory $history): ?stdClass
+    {
+        $changeType = $this->individualChangeType($history->action);
+        if ($changeType === null) {
+            return null;
+        }
+
+        $item = new stdClass;
+        $item->id = $history->id;
+        $item->composite_id = 'individual-'.$history->id;
+        $item->type = 'individual';
+        $item->type_label = __('Individual');
+        $item->change_type = $changeType;
+        $item->change_label = $this->individualChangeLabel($changeType);
+        $item->badge_color = $this->individualBadgeColor($changeType);
+        $item->created_at = $history->created_at;
+        $item->start_date = $history->scheduling?->date;
+        $item->end_date = $history->scheduling?->date;
+        $item->zone = $history->scheduling?->zone;
+        $item->zone_name = $history->scheduling?->zone?->name ?? '-';
+        $item->old_value = $this->individualValue($history, 'old');
+        $item->new_value = $this->individualValue($history, 'new');
+        $item->reason = $history->description;
+        $item->user = $history->user;
+        $item->affected_count = 1;
+        $item->source = $history;
+
+        return $item;
+    }
+
+    private function massiveValue(SchedulingChange $change, string $direction): string
+    {
+        if ($change->change_type === 'turn') {
+            $model = $direction === 'old' ? $change->oldShift : $change->newShift;
+
+            return $model ? $model->name.' ('.$model->hour_in.' - '.$model->hour_out.')' : '-';
+        }
+
+        if ($change->change_type === 'vehicle') {
+            $model = $direction === 'old' ? $change->oldVehicle : $change->newVehicle;
+
+            return $model ? $model->name.' ('.$model->plate.')' : '-';
+        }
+
+        if (in_array($change->change_type, ['driver', 'helper'])) {
+            $model = $direction === 'old' ? $change->oldPerson : $change->newPerson;
+
+            return $model ? $model->first_name.' '.$model->last_name : '-';
+        }
+
+        return '-';
+    }
+
+    private function individualChangeType(string $action): ?string
+    {
+        if (str_contains($action, 'Turno')) {
+            return 'turn';
+        }
+
+        if (str_contains($action, 'Vehiculo')) {
+            return 'vehicle';
+        }
+
+        if (str_contains($action, 'Conductor') || str_contains($action, 'Ayudante') || str_contains($action, 'Personal')) {
+            return in_array($action, ['Conductor', 'Reprogramacion - Conductor']) ? 'driver' : 'helper';
+        }
+
+        return null;
+    }
+
+    private function individualChangeLabel(string $changeType): string
+    {
+        return match ($changeType) {
+            'turn' => 'Turno',
+            'vehicle' => 'Vehiculo',
+            'driver' => 'Conductor',
+            'helper' => 'Ocupante',
+            default => ucfirst($changeType),
+        };
+    }
+
+    private function individualBadgeColor(string $changeType): string
+    {
+        return match ($changeType) {
+            'turn' => '#F4C542',
+            'vehicle' => '#1976D2',
+            'driver' => '#4CAF50',
+            'helper' => '#00BCD4',
+            default => '#999999',
+        };
+    }
+
+    private function individualValue(SchedulingHistory $history, string $direction): string
+    {
+        $value = $history->changes[$direction] ?? null;
+        if (blank($value)) {
+            return '-';
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->map(fn ($item, $key) => is_string($key) ? $key.': '.$item : $item)
+                ->implode(', ');
+        }
+
+        return (string) $value;
     }
 
     #[Computed]
@@ -351,8 +536,40 @@ class Index extends Component
             return null;
         }
 
-        return SchedulingChange::with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson', 'items.scheduling.zone', 'items.scheduling.shift', 'items.scheduling.vehicle', 'items.scheduling.groupDetails.employee'])
-            ->find($this->viewingId);
+        if (str_starts_with($this->viewingId, 'massive-')) {
+            $id = (int) str_replace('massive-', '', $this->viewingId);
+
+            return SchedulingChange::with(['user', 'zone', 'oldShift', 'newShift', 'oldVehicle', 'newVehicle', 'oldPerson', 'newPerson', 'items.scheduling.zone', 'items.scheduling.shift', 'items.scheduling.vehicle', 'items.scheduling.groupDetails.employee'])
+                ->find($id);
+        }
+
+        if (str_starts_with($this->viewingId, 'individual-')) {
+            $id = (int) str_replace('individual-', '', $this->viewingId);
+
+            return SchedulingHistory::with(['user', 'scheduling.zone', 'scheduling.shift', 'scheduling.vehicle', 'scheduling.groupDetails.employee'])
+                ->find($id);
+        }
+
+        return null;
+    }
+
+    #[Computed]
+    public function viewingData(): ?stdClass
+    {
+        $source = $this->viewingChange;
+        if (! $source) {
+            return null;
+        }
+
+        if ($source instanceof SchedulingChange) {
+            return $this->normalizeMassiveChange($source);
+        }
+
+        if ($source instanceof SchedulingHistory) {
+            return $this->normalizeIndividualChange($source);
+        }
+
+        return null;
     }
 
     #[Computed]
