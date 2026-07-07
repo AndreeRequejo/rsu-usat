@@ -393,6 +393,7 @@ class Index extends Component
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(fn ($history) => $this->normalizeIndividualChange($history))
+            ->filter()
             ->filter(fn ($item) => $this->typeFilter === '' || $item->change_type === $this->typeFilter);
     }
 
