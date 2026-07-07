@@ -708,9 +708,6 @@ new class extends Component {
                         </div>
                     </div>
 
-                    {{-- CAMBIO: si la programación está completa se muestra el botón
-                         "Ver información" (solo lectura). Si está incompleta se mantiene
-                         el botón "Cambiar personal" para abrir el editor. --}}
                     @if ($zone['completa'])
                         <button wire:click="openViewInfo({{ $zone['id'] }})"
                             class="w-full text-center text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg py-2 transition">
@@ -762,7 +759,6 @@ new class extends Component {
                         <i class="fas fa-users"></i> Cambio de Personal
                     </div>
 
-                    {{-- Una fila por cada rol actual: conductor y cada ayudante --}}
                     <div class="divide-y divide-gray-100">
                         @php
                             $driverEmp     = App\Models\Employee::find($driver_id);
@@ -807,8 +803,7 @@ new class extends Component {
                         </div>
 
                         @php $candidatosAyudante = $this->eligibleEmployees('Ayudante'); @endphp
-                        {{-- CAMBIO: antes era "$h < $this->maxHelpers" (capacidad del vehículo).
-                             Ahora itera solo sobre los ayudantes realmente asignados en $helper_ids. --}}
+
                         @for ($h = 0; $h < count($helper_ids); $h++)
                             @php
                                 $hId  = $helper_ids[$h] ?? null;
@@ -833,7 +828,7 @@ new class extends Component {
                                     <label class="mb-1 block text-sm font-bold text-sky-700">Nuevo Personal</label>
                                     <div class="flex items-center gap-2">
                                         <i class="fas fa-user-plus text-sky-500"></i>
-                                        {{-- CAMBIO: se bloquea el select si el ayudante actual está presente. --}}
+
                                         <select wire:model="change_new_ids.helper_ids.{{ $h }}"
                                             @disabled($hPresent)
                                             class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
@@ -849,10 +844,8 @@ new class extends Component {
                                 </div>
                             </div>
                         @endfor
-                        {{-- CAMBIO: antes comparaba contra $this->maxHelpers (capacidad del vehículo).
-                             Ahora se basa en la cantidad real de ayudantes asignados ($helper_ids). --}}
+
                         @if (count($helper_ids) === 0)
-                            {{-- Esta programación no tiene ayudantes asignados. --}}
                         @elseif ($candidatosAyudante->isEmpty())
                             <p class="px-4 pb-2 -mt-2 text-xs text-gray-400">Sin ayudantes con asistencia confirmada disponibles.</p>
                         @endif

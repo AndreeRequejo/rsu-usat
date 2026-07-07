@@ -27,7 +27,6 @@ class DashboardSeeder extends Seeder
             return;
         }
 
-        // ── Empleados reales, buscados por DNI para respetar su tipo real (Conductor / Ayudante) ──
         $conductores = collect([
             Employee::where('dni', '70000001')->first(), // Diaz Vidarte Miguel
             Employee::where('dni', '70000002')->first(), // Guerrero Carlos
