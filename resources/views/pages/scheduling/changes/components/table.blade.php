@@ -131,6 +131,7 @@
                                             <th class="px-3 py-2 text-left">{{ __('Turno') }}</th>
                                             <th class="px-3 py-2 text-left">{{ __('Vehiculo') }}</th>
                                             <th class="px-3 py-2 text-left">{{ __('Personal') }}</th>
+                                            <th class="px-3 py-2 text-right">{{ __('Acciones') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -141,6 +142,15 @@
                                                 <td class="px-3 py-2">{{ $item->scheduling?->shift?->name ?? '-' }}</td>
                                                 <td class="px-3 py-2">{{ $item->scheduling?->vehicle?->name ?? '-' }}</td>
                                                 <td class="px-3 py-2">{{ $item->scheduling?->groupDetails?->map(fn($gd) => ($gd->employee?->first_name ?? '') . ' ' . ($gd->employee?->last_name ?? ''))->implode(', ') ?? '-' }}</td>
+                                                <td class="px-3 py-2">
+                                                    <div class="flex justify-end">
+                                                        <button wire:click="openEditItem({{ $item->id }})" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[#F4C542] hover:bg-[#F4C542]/20 transition" title="Editar" aria-label="Editar">
+                                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -161,4 +171,78 @@
     <div class="px-4 py-3 border-t border-[#A5D6A7]">
         {{ $this->changes->links() }}
     </div>
+
+    @if ($this->editingItemId)
+        <flux:modal
+            name="edit-item-modal"
+            class="w-[500px] max-w-[98vw] max-h-[95vh] overflow-hidden flex flex-col"
+            wire:close="closeItemEdit"
+        >
+            <div class="flex flex-col h-full">
+                <div class="px-6 py-4 border-b border-[#A5D6A7] shrink-0 flex items-center justify-between" style="background-color: #1976D2;">
+                    <div class="flex items-center gap-2 text-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                        </svg>
+                        <flux:heading size="lg" class="text-white">
+                            {{ __('Editar Programacion') }}
+                        </flux:heading>
+                    </div>
+                </div>
+
+                <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+                    @if ($this->editingChangeType === 'turn')
+                        <div>
+                            <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Turno') }}</label>
+                            <select wire:model="edit_item_shift_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                                <option value="">{{ __('Seleccionar...') }}</option>
+                                @foreach ($this->shifts as $shift)
+                                    <option value="{{ $shift->id }}">{{ $shift->name }} ({{ $shift->hour_in }} - {{ $shift->hour_out }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif ($this->editingChangeType === 'vehicle')
+                        <div>
+                            <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Vehiculo') }}</label>
+                            <select wire:model="edit_item_vehicle_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                                <option value="">{{ __('Seleccionar...') }}</option>
+                                @foreach ($this->vehicles as $vehicle)
+                                    <option value="{{ $vehicle->id }}">{{ $vehicle->name }} ({{ $vehicle->plate }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif ($this->editingChangeType === 'driver')
+                        <div>
+                            <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Conductor') }}</label>
+                            <select wire:model="edit_item_driver_id" class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]">
+                                <option value="">{{ __('Seleccionar...') }}</option>
+                                @foreach ($this->employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif ($this->editingChangeType === 'helper')
+                        <div>
+                            <label class="block text-sm font-medium text-[#333333] mb-1">{{ __('Ocupantes') }}</label>
+                            <select wire:model="edit_item_helper_ids" multiple class="w-full px-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57] min-h-[120px]">
+                                @foreach ($this->employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-[#999999] mt-1">{{ __('Mantenga presionado Ctrl para seleccionar varios') }}</p>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="px-6 py-4 bg-[#F5F5F5] border-t border-[#E0E0E0] flex justify-end gap-3 shrink-0">
+                    <flux:button type="button" variant="ghost" wire:click="closeItemEdit" class="text-[#333333]">
+                        {{ __('Cancelar') }}
+                    </flux:button>
+                    <flux:button type="button" variant="primary" wire:click="saveItemEdit" icon="check" class="bg-[#1976D2] text-white hover:bg-[#1565C0]">
+                        {{ __('Guardar') }}
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
+    @endif
 </div>

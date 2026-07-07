@@ -4,6 +4,7 @@ namespace App\Livewire\Pages\Scheduling\Changes;
 
 use App\Models\ChangeReason;
 use App\Models\Employee;
+use App\Models\EmployeeType;
 use App\Models\Scheduling;
 use App\Models\SchedulingChange;
 use App\Models\SchedulingChangeItem;
@@ -39,6 +40,21 @@ class Index extends Component
     public ?int $deletingId = null;
 
     public array $expandedChanges = [];
+
+    // Edicion de item de cambio masivo
+    public ?int $editingItemId = null;
+
+    public ?int $editingChangeId = null;
+
+    public string $editingChangeType = '';
+
+    public ?int $edit_item_shift_id = null;
+
+    public ?int $edit_item_vehicle_id = null;
+
+    public ?int $edit_item_driver_id = null;
+
+    public array $edit_item_helper_ids = [];
 
     // Formulario de cambio masivo
     public string $massive_start_date = '';
@@ -314,6 +330,121 @@ class Index extends Component
         $this->deletingId = null;
         Flux::modal('confirm-delete-change')->close();
         Flux::toast(variant: 'success', text: 'Cambio eliminado correctamente.');
+    }
+
+    public function openEditItem(int $itemId): void
+    {
+        $item = SchedulingChangeItem::with(['schedulingChange', 'scheduling.groupDetails'])->find($itemId);
+        if (! $item) {
+            Flux::toast(variant: 'warning', text: 'No se encontro el item a editar.');
+
+            return;
+        }
+
+        $this->editingItemId = $item->id;
+        $this->editingChangeId = $item->scheduling_change_id;
+        $this->editingChangeType = $item->schedulingChange->change_type;
+
+        $scheduling = $item->scheduling;
+        $driverTypeId = EmployeeType::where('name', 'Conductor')->first()?->id;
+        $helperTypeId = EmployeeType::where('name', 'Ayudante')->first()?->id;
+
+        $this->edit_item_shift_id = $scheduling?->shift_id;
+        $this->edit_item_vehicle_id = $scheduling?->vehicle_id;
+        $this->edit_item_driver_id = $scheduling?->groupDetails
+            ->first(fn ($gd) => $gd->employee?->employee_type_id === $driverTypeId)?->employee_id ?? null;
+        $this->edit_item_helper_ids = $scheduling?->groupDetails
+            ->filter(fn ($gd) => $gd->employee?->employee_type_id === $helperTypeId)
+            ->pluck('employee_id')
+            ->toArray() ?? [];
+
+        Flux::modal('edit-item-modal')->show();
+    }
+
+    public function closeItemEdit(): void
+    {
+        $this->editingItemId = null;
+        $this->editingChangeId = null;
+        $this->editingChangeType = '';
+        $this->edit_item_shift_id = null;
+        $this->edit_item_vehicle_id = null;
+        $this->edit_item_driver_id = null;
+        $this->edit_item_helper_ids = [];
+        Flux::modal('edit-item-modal')->close();
+    }
+
+    public function saveItemEdit(): void
+    {
+        if (! $this->editingItemId || ! $this->editingChangeId) {
+            Flux::toast(variant: 'warning', text: 'No hay item en edicion.');
+
+            return;
+        }
+
+        $item = SchedulingChangeItem::with(['schedulingChange', 'scheduling.groupDetails'])->find($this->editingItemId);
+        if (! $item) {
+            Flux::toast(variant: 'warning', text: 'No se encontro el item a editar.');
+
+            return;
+        }
+
+        $scheduling = $item->scheduling;
+        if (! $scheduling) {
+            Flux::toast(variant: 'warning', text: 'No se encontro la programacion asociada.');
+
+            return;
+        }
+
+        $changeType = $this->editingChangeType;
+
+        DB::transaction(function () use ($item, $scheduling, $changeType) {
+            if ($changeType === 'turn') {
+                $scheduling->update(['shift_id' => $this->edit_item_shift_id]);
+            } elseif ($changeType === 'vehicle') {
+                $scheduling->update(['vehicle_id' => $this->edit_item_vehicle_id]);
+            } elseif ($changeType === 'driver') {
+                $this->updateGroupDetail($scheduling, $this->edit_item_driver_id, 'Conductor');
+            } elseif ($changeType === 'helper') {
+                $this->updateHelperGroupDetails($scheduling, $this->edit_item_helper_ids);
+            }
+
+            $after = [
+                'shift_id' => $scheduling->fresh()->shift_id,
+                'vehicle_id' => $scheduling->fresh()->vehicle_id,
+                'employees' => $scheduling->fresh()->groupDetails->pluck('employee_id')->values()->all(),
+            ];
+
+            $item->update(['after' => $after]);
+        });
+
+        Flux::toast(variant: 'success', text: 'Programacion actualizada correctamente.');
+        $this->closeItemEdit();
+    }
+
+    private function updateGroupDetail(Scheduling $scheduling, ?int $employeeId, string $role): void
+    {
+        $driverTypeId = EmployeeType::where('name', 'Conductor')->first()?->id;
+        $existing = $scheduling->groupDetails()
+            ->whereHas('employee', fn ($q) => $q->where('employee_type_id', $driverTypeId))
+            ->first();
+
+        if ($existing) {
+            $existing->update(['employee_id' => $employeeId]);
+        } elseif ($employeeId) {
+            $scheduling->groupDetails()->create(['employee_id' => $employeeId]);
+        }
+    }
+
+    private function updateHelperGroupDetails(Scheduling $scheduling, array $helperIds): void
+    {
+        $helperIds = array_values(array_filter($helperIds));
+        $helperTypeId = EmployeeType::where('name', 'Ayudante')->first()?->id;
+        $scheduling->groupDetails()
+            ->whereHas('employee', fn ($q) => $q->where('employee_type_id', $helperTypeId))
+            ->delete();
+        foreach ($helperIds as $helperId) {
+            $scheduling->groupDetails()->create(['employee_id' => $helperId]);
+        }
     }
 
     public function resetFilters(): void
