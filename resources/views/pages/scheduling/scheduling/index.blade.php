@@ -5,6 +5,8 @@ use App\Models\EmployeeType;
 use App\Models\GroupDetail;
 use App\Models\Holiday;
 use App\Models\Scheduling;
+use App\Models\SchedulingChange;
+use App\Models\SchedulingChangeItem;
 use App\Models\SchedulingHistory;
 use App\Models\Shift;
 use App\Models\StaffGroup;
@@ -14,6 +16,7 @@ use App\Models\Zone;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Flux\Flux;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
@@ -407,18 +410,25 @@ new class extends Component
         }
 
         if ($this->editingId) {
-            $scheduling = Scheduling::findOrFail($this->editingId);
-            $before = $scheduling->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes']);
-            $scheduling->update([
-                'date' => $schedulableDates->first()->format('Y-m-d'),
-                'shift_id' => $this->shift_id,
-                'vehicle_id' => $this->vehicle_id,
-                'zone_id' => $this->zone_id,
-                'status' => 'Reprogramado',
-                'notes' => $this->notes,
-            ]);
-            $this->syncGroupDetails($scheduling);
-            $this->writeHistory($scheduling->id, 'Reprogramacion', $this->change_reason, ['before' => $before, 'after' => $scheduling->fresh()->only(['date', 'shift_id', 'vehicle_id', 'zone_id', 'status', 'notes'])]);
+            DB::transaction(function () use ($schedulableDates) {
+                $scheduling = Scheduling::with('groupDetails')->findOrFail($this->editingId);
+                $before = $this->schedulingSnapshot($scheduling);
+
+                $scheduling->update([
+                    'date' => $schedulableDates->first()->format('Y-m-d'),
+                    'shift_id' => $this->shift_id,
+                    'vehicle_id' => $this->vehicle_id,
+                    'zone_id' => $this->zone_id,
+                    'status' => 'Reprogramado',
+                    'notes' => $this->notes,
+                ]);
+                $this->syncGroupDetails($scheduling);
+
+                $after = $this->schedulingSnapshot($scheduling->fresh('groupDetails'));
+                $this->writeHistory($scheduling->id, 'Reprogramacion', $this->change_reason, ['before' => $before, 'after' => $after]);
+                $this->recordDetectedSchedulingChanges($scheduling, $before, $after, $this->change_reason);
+            });
+
             Flux::toast(variant: 'success', text: 'Programacion actualizada.');
         } else {
             foreach ($schedulableDates as $date) {
@@ -595,33 +605,8 @@ new class extends Component
             return;
         }
 
-        $scheduling = Scheduling::with('groupDetails')->findOrFail($this->editingId);
-        $before = [
-            'date' => $scheduling->date?->format('Y-m-d'),
-            'shift_id' => $scheduling->shift_id,
-            'vehicle_id' => $scheduling->vehicle_id,
-            'zone_id' => $scheduling->zone_id,
-            'status' => $scheduling->status,
-            'employees' => $scheduling->groupDetails->pluck('employee_id')->values()->all(),
-        ];
-
         foreach ($this->registeredChanges as $change) {
-            if ($change['field'] === 'shift_id') {
-                $this->shift_id = (int) $change['new_id'];
-            }
-
-            if ($change['field'] === 'vehicle_id') {
-                $this->vehicle_id = (int) $change['new_id'];
-            }
-
-            if ($change['field'] === 'driver_id') {
-                $this->driver_id = (int) $change['new_id'];
-            }
-
-            if (str_starts_with($change['field'], 'helper_ids.')) {
-                $index = (int) str_replace('helper_ids.', '', $change['field']);
-                $this->helper_ids[$index] = (int) $change['new_id'];
-            }
+            $this->applyRegisteredChangeToForm($change);
         }
 
         $this->availabilityErrors = $this->validateReprogrammingState($this->reprogrammingState());
@@ -632,22 +617,31 @@ new class extends Component
             return;
         }
 
-        $scheduling->update([
-            'shift_id' => $this->shift_id,
-            'vehicle_id' => $this->vehicle_id,
-            'status' => 'Reprogramado',
-            'notes' => $this->notes,
-        ]);
+        DB::transaction(function () {
+            $scheduling = Scheduling::with('groupDetails')->findOrFail($this->editingId);
+            $before = $this->schedulingSnapshot($scheduling);
 
-        $this->syncGroupDetails($scheduling);
-
-        foreach ($this->registeredChanges as $change) {
-            $this->writeHistory($scheduling->id, 'Reprogramacion - '.$change['label'], $change['reason'], [
-                'before' => $change['old_value'],
-                'after' => $change['new_value'],
-                'snapshot_before' => $before,
+            $scheduling->update([
+                'shift_id' => $this->shift_id,
+                'vehicle_id' => $this->vehicle_id,
+                'status' => 'Reprogramado',
+                'notes' => $this->notes,
             ]);
-        }
+
+            $this->syncGroupDetails($scheduling);
+            $after = $this->schedulingSnapshot($scheduling->fresh('groupDetails'));
+
+            foreach ($this->registeredChanges as $change) {
+                $this->writeHistory($scheduling->id, 'Reprogramacion - '.$change['label'], $change['reason'], [
+                    'before' => $change['old_value'],
+                    'after' => $change['new_value'],
+                    'snapshot_before' => $before,
+                    'snapshot_after' => $after,
+                ]);
+
+                $this->recordSchedulingChange($scheduling, $change, $before, $after);
+            }
+        });
 
         Flux::toast(variant: 'success', text: 'Programacion reprogramada.');
         $this->resetForm();
@@ -1303,6 +1297,138 @@ new class extends Component
             ->push($change)
             ->values()
             ->all();
+    }
+
+    private function applyRegisteredChangeToForm(array $change): void
+    {
+        if ($change['field'] === 'shift_id') {
+            $this->shift_id = (int) $change['new_id'];
+        }
+
+        if ($change['field'] === 'vehicle_id') {
+            $this->vehicle_id = (int) $change['new_id'];
+        }
+
+        if ($change['field'] === 'driver_id') {
+            $this->driver_id = (int) $change['new_id'];
+        }
+
+        if (str_starts_with($change['field'], 'helper_ids.')) {
+            $index = (int) str_replace('helper_ids.', '', $change['field']);
+            $this->helper_ids[$index] = (int) $change['new_id'];
+        }
+    }
+
+    private function schedulingSnapshot(Scheduling $scheduling): array
+    {
+        return [
+            'date' => $scheduling->date?->format('Y-m-d'),
+            'shift_id' => $scheduling->shift_id,
+            'vehicle_id' => $scheduling->vehicle_id,
+            'zone_id' => $scheduling->zone_id,
+            'status' => $scheduling->status,
+            'notes' => $scheduling->notes,
+            'employees' => $scheduling->groupDetails->pluck('employee_id')->values()->all(),
+        ];
+    }
+
+    private function recordDetectedSchedulingChanges(Scheduling $scheduling, array $before, array $after, string $reason): void
+    {
+        if ((int) ($before['shift_id'] ?? 0) !== (int) ($after['shift_id'] ?? 0)) {
+            $this->recordSchedulingChange($scheduling, [
+                'type' => 'turn',
+                'field' => 'shift_id',
+                'old_id' => $before['shift_id'],
+                'new_id' => $after['shift_id'],
+                'reason' => $reason,
+            ], $before, $after);
+        }
+
+        if ((int) ($before['vehicle_id'] ?? 0) !== (int) ($after['vehicle_id'] ?? 0)) {
+            $this->recordSchedulingChange($scheduling, [
+                'type' => 'vehicle',
+                'field' => 'vehicle_id',
+                'old_id' => $before['vehicle_id'],
+                'new_id' => $after['vehicle_id'],
+                'reason' => $reason,
+            ], $before, $after);
+        }
+
+        $beforeEmployees = array_values($before['employees'] ?? []);
+        $afterEmployees = array_values($after['employees'] ?? []);
+
+        if ((int) ($beforeEmployees[0] ?? 0) !== (int) ($afterEmployees[0] ?? 0)) {
+            $this->recordSchedulingChange($scheduling, [
+                'type' => 'driver',
+                'field' => 'driver_id',
+                'old_id' => $beforeEmployees[0] ?? null,
+                'new_id' => $afterEmployees[0] ?? null,
+                'reason' => $reason,
+            ], $before, $after);
+        }
+
+        $helperCount = max(count($beforeEmployees), count($afterEmployees));
+        for ($index = 1; $index < $helperCount; $index++) {
+            if ((int) ($beforeEmployees[$index] ?? 0) === (int) ($afterEmployees[$index] ?? 0)) {
+                continue;
+            }
+
+            $this->recordSchedulingChange($scheduling, [
+                'type' => 'helper',
+                'field' => 'helper_ids.'.($index - 1),
+                'old_id' => $beforeEmployees[$index] ?? null,
+                'new_id' => $afterEmployees[$index] ?? null,
+                'reason' => $reason,
+            ], $before, $after);
+        }
+    }
+
+    private function recordSchedulingChange(Scheduling $scheduling, array $change, array $before, array $after): void
+    {
+        $changeType = $this->schedulingChangeType($change);
+
+        $record = SchedulingChange::create([
+            'user_id' => auth()->id(),
+            'change_type' => $changeType,
+            'start_date' => $after['date'] ?? $before['date'],
+            'end_date' => $after['date'] ?? $before['date'],
+            'zone_id' => $after['zone_id'] ?? $before['zone_id'] ?? $scheduling->zone_id,
+            'old_shift_id' => $changeType === 'turn' ? $change['old_id'] : null,
+            'new_shift_id' => $changeType === 'turn' ? $change['new_id'] : null,
+            'old_vehicle_id' => $changeType === 'vehicle' ? $change['old_id'] : null,
+            'new_vehicle_id' => $changeType === 'vehicle' ? $change['new_id'] : null,
+            'old_person_id' => in_array($changeType, ['driver', 'helper'], true) ? $change['old_id'] : null,
+            'new_person_id' => in_array($changeType, ['driver', 'helper'], true) ? $change['new_id'] : null,
+            'person_role' => in_array($changeType, ['driver', 'helper'], true) ? $changeType : null,
+            'reason_preset' => $change['reason'] ?? null,
+            'reason_detail' => null,
+            'reason_full' => $change['reason'] ?? null,
+            'affected_count' => 1,
+        ]);
+
+        SchedulingChangeItem::create([
+            'scheduling_change_id' => $record->id,
+            'scheduling_id' => $scheduling->id,
+            'before' => $before,
+            'after' => $after,
+        ]);
+    }
+
+    private function schedulingChangeType(array $change): string
+    {
+        if (($change['type'] ?? null) === 'turn') {
+            return 'turn';
+        }
+
+        if (($change['type'] ?? null) === 'vehicle') {
+            return 'vehicle';
+        }
+
+        if (($change['field'] ?? null) === 'driver_id') {
+            return 'driver';
+        }
+
+        return 'helper';
     }
 
     private function reprogrammingState(array $overrides = []): array

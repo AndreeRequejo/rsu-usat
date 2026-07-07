@@ -13,7 +13,7 @@ return new class extends Migration
             $table->date('date')->unique();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true)->after('description');
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
