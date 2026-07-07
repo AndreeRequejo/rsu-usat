@@ -13,6 +13,8 @@ new class extends Component {
     use WithPagination;
 
     public string $search = '';
+    public string $date_from = '';
+    public string $date_to = '';
 
     public bool $showModal = false;
 
@@ -28,6 +30,14 @@ new class extends Component {
 
     public string $status = 'Presente';
     public string $notes = '';
+
+    public function mount(): void
+    {
+        $today = now()->timezone('America/Lima')->toDateString();
+
+        $this->date_from = $today;
+        $this->date_to = $today;
+    }
 
     protected function rules(): array
     {
@@ -87,6 +97,12 @@ new class extends Component {
                         ->orWhere('dni', 'like', '%' . $this->search . '%');
                 });
             })
+            ->when($this->date_from !== '', function ($query) {
+                $query->whereDate('attendance_date', '>=', $this->date_from);
+            })
+            ->when($this->date_to !== '', function ($query) {
+                $query->whereDate('attendance_date', '<=', $this->date_to);
+            })
             ->latest('attendance_date')
             ->latest('attendance_time')
             ->paginate(10);
@@ -94,6 +110,26 @@ new class extends Component {
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedDateFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateTo(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearDateFilters(): void
+    {
+        $today = now()->timezone('America/Lima')->toDateString();
+
+        $this->date_from = $today;
+        $this->date_to = $today;
+
         $this->resetPage();
     }
 
@@ -400,22 +436,50 @@ public function save(): void
     </div>
     <div class="bg-white rounded-xl shadow-sm border border-[#A5D6A7] p-5 mb-6">
 
-        <label class="block text-sm font-medium text-[#333333] mb-2">
-            {{ __('Buscar por empleado o DNI') }}
-        </label>
+        <div class="grid gap-4 lg:grid-cols-4">
 
-        <div class="flex gap-3">
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-[#333333] mb-2">
+                    {{ __('Buscar por empleado o DNI') }}
+                </label>
 
-            <div class="relative flex-1">
+                <div class="relative">
 
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#333333]" fill="none"
-                    stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#333333]" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
 
-                <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('Buscar...') }}"
-                    class="w-full pl-10 pr-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]" />
+                    <input type="text" wire:model.live.debounce.300ms="search" placeholder="{{ __('Buscar...') }}"
+                        class="w-full pl-10 pr-4 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]" />
+
+                </div>
+
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#333333] mb-2">
+                    {{ __('Desde') }}
+                </label>
+
+                <input type="date" wire:model.live="date_from"
+                    class="w-full px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-[#333333] mb-2">
+                    {{ __('Hasta') }}
+                </label>
+
+                <div class="flex gap-2">
+                    <input type="date" wire:model.live="date_to"
+                        class="w-full px-3 py-2.5 border border-[#A5D6A7] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2E8B57]" />
+
+                    <flux:button type="button" wire:click="clearDateFilters" variant="ghost" class="whitespace-nowrap">
+                        {{ __('Limpiar') }}
+                    </flux:button>
+                </div>
 
             </div>
 
