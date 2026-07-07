@@ -381,6 +381,7 @@ class Index extends Component
                     ->orWhere('action', 'like', 'Finalizacion%')
                     ->orWhere('action', 'like', 'Eliminacion%');
             })
+            ->where('action', 'not like', 'Reprogramacion - %')
             ->when($this->search !== '', function (Builder $query) {
                 $query->where(function (Builder $q) {
                     $q->where('description', 'like', '%'.$this->search.'%')
@@ -399,11 +400,13 @@ class Index extends Component
 
     private function normalizeMassiveChange(SchedulingChange $change): stdClass
     {
+        $isMassive = $change->affected_count > 1;
+
         $item = new stdClass;
         $item->id = $change->id;
         $item->composite_id = 'massive-'.$change->id;
-        $item->type = 'massive';
-        $item->type_label = __('Masivo');
+        $item->type = $isMassive ? 'massive' : 'individual';
+        $item->type_label = $isMassive ? __('Masivo') : __('Individual');
         $item->change_type = $change->change_type;
         $item->change_label = $change->type_label;
         $item->badge_color = $change->type_badge_color;
